@@ -1,0 +1,2 @@
+#define FILEBRIDGE_API __declspec(dllexport)
+#define FILEBRIDGE_API __declspec(dllimport)
