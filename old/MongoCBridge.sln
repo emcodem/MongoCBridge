@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.9.34607.119
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MongoCBridge", "MongoCBridge.vcxproj", "{59C616CE-73CB-4F0F-9410-27745DBE2B23}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FileBridge++", "FileBridge++.vcxproj", "{59C616CE-73CB-4F0F-9410-27745DBE2B23}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -26,6 +26,6 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {708AD6FD-FD60-48B9-8A31-1C073935E7FB}
+		SolutionGuid = {58B58814-23DB-4386-98BA-22D9E42E9750}
 	EndGlobalSection
 EndGlobal
