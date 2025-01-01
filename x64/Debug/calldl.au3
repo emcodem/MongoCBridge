@@ -1,37 +1,43 @@
 #AutoIt3Wrapper_UseX64=Y
+;#AutoIt3Wrapper_Au3Check_Parameters=-d -w 1 -w 2 -w 3 -w- 4 -w 5 -w 6 -w- 7
 #include <C:\dev\FFAStrans\Processors\JSON.au3>
 #include <WinAPIError.au3>
 #include <WinAPIMisc.au3>
 #include <Array.au3>
 ;C:\Users\Gam3r1\AppData\Local\Temp\mongod.exe --dbpath C:\temp\filebrdg
 Opt("MustDeclareVars", 1)
-
+MsgBox(0,"","")
 Global Const $g_sFileDll    = 'C:\dev\MongoCBridge\x64\Debug\MongoCBridge.dll'
 
 Global $s_mongo_url 		= "mongodb://localhost:27017"
 Global $s_mongo_database_name 	= "harrysDB"
 Global $s_mongo_collection_name 	= "testcollection"
 
-Local $jsonstr = '{"path":"/folder/subfolder/fname.json","content":{"jsoncont":"no"}}'
+Local $small_jsonstr = '{"path":"/folder/subfolder/fname.json","wf_id":"0230625-1518-1896-1790-0dda9dfc0f34"}'
 Local $bigjsonstr = 'C:\temp\ffas_ben\Processors\db\configs\workflows\20230625-1518-1896-1790-0dda9dfc0f34.json'
-$bigjsonstr = FileRead($bigjsonstr)
+Local $projection_wf_id = '{"projection": {"path": 1,"wf_id": 1},"sort": {"wf_id": 1}}'
 
+$bigjsonstr = FileRead($bigjsonstr)
 Local $hdll = DllOpen($g_sFileDll)
-MsgBox(0,"","")
 Local $ptr_mongocollection = CreateCollection($s_mongo_url, $s_mongo_database_name, $s_mongo_collection_name)
 
+InsertOne($ptr_mongocollection,$small_jsonstr)
+FindOne($ptr_mongocollection,"{}",$projection_wf_id)
+UpdateOne($ptr_mongocollection,"{}",'{"$set":'&$bigjsonstr&'}','{"upsert":true}')
+
+Exit
 ; This demo loops through all documents for benchmark
-For $i = 1 To 1 Step -1
-	Local $nextdoc
-	Local $ptr_mongocursor = FindMany($ptr_mongocollection, '{}', '{}')
-	Local $doccnt = 0;
-	While CursorNext($ptr_mongocursor,$nextdoc)
-		$doccnt+=1
-		ConsoleWrite("Retrieved Document # " & $doccnt & ", strlen: " & StringLen($nextdoc) & @CRLF)
-		ConsoleWrite("Run" & $i)
-	WEnd
-	CursorDestroy($ptr_mongocursor)
-Next
+;~ For $i = 1 To 1 Step -1
+;~ 	Local $nextdoc
+;~ 	Local $ptr_mongocursor = FindMany($ptr_mongocollection, '{}', '{"projection": {"path": 1,"wf_id": 1},"sort": {"wf_id": 1}}')
+;~ 	Local $doccnt = 0;
+;~ 	While CursorNext($ptr_mongocursor,$nextdoc)
+;~ 		$doccnt+=1
+;~ 		ConsoleWrite("Retrieved Document # " & $doccnt & ", Content: " & $nextdoc & @CRLF)
+;~ 		ConsoleWrite("Run" & $i)
+;~ 	WEnd
+;~ 	CursorDestroy($ptr_mongocursor)
+;~ Next
 
 
 UpdateOne($ptr_mongocollection, '{"path":"/folder/subfolder/fname.json"}','{"$set":'&$bigjsonstr&'}','{"upsert":true}')
@@ -49,69 +55,64 @@ UpdateOne($ptr_mongocollection, '{"path":"/folder/subfolder/fname.json"}','{"$se
 ;;
 Func CreateCollection($s_mongoconnectionstr, $s_mongo_database_name, $s_mongo_collection_name)
 	;~ if DB is offline, we still get a valid collection that works once the db comes online
-	Local $constr_ptr = DllStructCreate("wchar [" & StringLen($s_mongoconnectionstr) + 1 & "]") ; +1 for null terminator
-	DllStructSetData($constr_ptr, 1, $s_mongoconnectionstr)
-	Local $dbname_ptr = DllStructCreate("wchar [" & StringLen($s_mongo_database_name) + 1 & "]") ; +1 for null terminator
-	DllStructSetData($dbname_ptr, 1, $s_mongo_database_name)
-	Local $colname_ptr = DllStructCreate("wchar [" & StringLen($s_mongo_collection_name) + 1 & "]") ; +1 for null terminator
-	DllStructSetData($colname_ptr, 1, $s_mongo_collection_name)
-	Local $a_result = DllCall($hdll, "ptr", "CreateCollection", "ptr", DllStructGetPtr($constr_ptr),"ptr", DllStructGetPtr($dbname_ptr),"ptr", DllStructGetPtr($colname_ptr));
+	Local $_s1,$_s2,$_s3
+	Local $constr_ptr  = __MakeWstrPtr($s_mongoconnectionstr,$_s1)
+	Local $dbname_ptr  = __MakeWstrPtr($s_mongo_database_name,$_s2)
+	Local $colname_ptr = __MakeWstrPtr($s_mongo_collection_name,$s_3)
+	Local $a_result = DllCall($hdll, "ptr", "CreateCollection", "ptr", $constr_ptr,"ptr", $dbname_ptr,"ptr", $colname_ptr);
 	ConsoleWrite("CreateCollection: " & $a_result[0] & " Error: " & _WinAPI_GetLastError() & @CRLF)
 	return $a_result[0]
 EndFunc
 
 Func InsertOne($ptr_mongocollection,$s_json)
-	Local $struct = DllStructCreate("wchar [" & StringLen($s_json) + 1 & "]") ; +1 for null terminator
-	DllStructSetData($struct, 1, $s_json)
-	Local $a_insertresult = DllCall($hdll, "int:cdecl", "InsertOne", "ptr", $ptr_mongocollection, "ptr",DllStructGetPtr($struct))
+	Local $_s1
+	Local $_jsonptr = __MakeWstrPtr($s_json,$_s1)
+	Local $a_insertresult = DllCall($hdll, "int:cdecl", "InsertOne", "ptr", $ptr_mongocollection, "ptr",$_jsonptr)
 	ConsoleWrite("InsertResult: " & $a_insertresult[0] & " Error: " & _WinAPI_GetLastError() & @CRLF)
 EndFunc
 
 Func UpdateOne($ptr_mongocollection, $search, $update, $options)
-	;~https://www.mongodb.com/docs/manual/reference/method/db.collection.updateOne/
-	;~commonly used options: {"upsert":true}
-	;~returns json str like { "modifiedCount" : 1, "matchedCount" : 1, "upsertedCount" : 0 }
-	Local $_searchptr
-	MakeWstrPtr($_searchptr,$search)
-	Local $_updateptr
-	MakeWstrPtr($_updateptr,$update)
-	Local $_optptr
-	MakeWstrPtr($_optptr,$options)
-	Local $a_result = DllCall($hdll, "WSTR", "UpdateOne", "ptr",$ptr_mongocollection, "ptr", DllStructGetPtr($_searchptr), "ptr", DllStructGetPtr($_updateptr), "ptr", DllStructGetPtr($_optptr));
+	;~ https://www.mongodb.com/docs/manual/reference/method/db.collection.updateOne/
+	;~ commonly used options: {"upsert":true}
+	;~ returns json str like { "modifiedCount" : 1, "matchedCount" : 1, "upsertedCount" : 0 }
+	Local $_s1,$_s2,$_s3;
+	Local $_searchptr 	= __MakeWstrPtr($search, $_s1)
+	Local $_updateptr 	= __MakeWstrPtr($update, $_s2)
+	Local $_optptr 		= __MakeWstrPtr($options,$_s3)
+	Local $a_result 	= DllCall($hdll, "WSTR", "UpdateOne", "ptr", $ptr_mongocollection, "ptr", $_searchptr, "ptr", $_updateptr, "ptr", $_optptr);
 	ConsoleWrite("UpdateOne: " & $a_result[0] & " Error: " & _WinAPI_GetLastError() & @CRLF)
 	return $a_result[0]
 EndFunc
 
-Func FindOne($ptr_mongocollection, $s_query)
-	Local $ptr = DllStructCreate("wchar [" & StringLen($s_query) + 1 & "]") ; +1 for null terminator
-	DllStructSetData($ptr, 1, $s_query)
-	Local $a_found = DllCall($hdll, "WSTR", "FindOne", "ptr", $ptr_mongocollection, "ptr", DllStructGetPtr($ptr) ) ;the C side prints Hello to ConsoleRead
+Func FindOne($ptr_mongocollection, $s_query, $s_projection)
+	Local $_s1,$_s2
+	Local $pQuery 		= __MakeWstrPtr($s_query,$_s1)
+	Local $pProjection	= __MakeWstrPtr($s_projection,$_s2)
+	Local $a_found = DllCall($hdll, "WSTR", "FindOne", "ptr", $ptr_mongocollection, "ptr", $pQuery, "ptr", $pProjection ) ;the C side prints Hello to ConsoleRead
 	ConsoleWrite("FindOne: " & $a_found[0] & " Error: " & _WinAPI_GetLastError() & @CRLF)
 EndFunc
 
 Func DeleteOne($ptr_mongocollection, $s_query)
 	;~returns 1 if 1 document was deleted, otherwise 0
-	Local $_searchptr
-	MakeWstrPtr($_searchptr,$s_query)
-	Local $a_result = DllCall($hdll, "int", "DeleteOne", "ptr", $ptr_mongocollection, "ptr", DllStructGetPtr($_searchptr));
+	Local $_s1;
+	Local $_searchptr 	= __MakeWstrPtr($_searchptr,$_s1)
+	Local $a_result 	= DllCall($hdll, "int", "DeleteOne", "ptr", $ptr_mongocollection, "ptr", $_searchptr);
 	ConsoleWrite("DeleteOne: " & $a_result[0] & " Error: " & _WinAPI_GetLastError() & @CRLF)
 	return $a_result[0]
 EndFunc
 
 Func FindMany($ptr_mongocollection, $s_query, $s_opts)
 	;~ returns pointer to mongo cursor, use CursorNext and CursorDestroy for interaction
-	Local $_searchptr
-	MakeWstrPtr($_searchptr,$s_query)
-	Local $_searchopts
-	MakeWstrPtr($_searchopts,$s_opts)
-	Local $a_result = DllCall($hdll, "ptr", "FindMany", "ptr", $ptr_mongocollection, "ptr", DllStructGetPtr($_searchptr), "ptr", DllStructGetPtr($_searchopts));
+	Local $_s1,$_s2
+	Local $_searchptr 	= __MakeWstrPtr($_searchptr,$_s1)
+	Local $_searchopts 	= __MakeWstrPtr($_searchopts,$_s2)
+	Local $a_result = DllCall($hdll, "ptr", "FindMany", "ptr", $ptr_mongocollection, "ptr", $_searchptr, "ptr", $_searchopts);
 	ConsoleWrite("FindMany Cursor Ptr: " & $a_result[0] & " Error: " & _WinAPI_GetLastError() & @CRLF)
 	return $a_result[0]
 EndFunc
 
 Func CursorNext($ptr_cursor, ByRef $next_doc)
-	Local $_resultptr
-	;attempt to pass a pointer to pointer to allow the dll to return a pointer to the memory of the json string
+	Local $_resultptr ; pass a pointer to pointer to allow the dll to return a pointer to the memory of the json string
 	Local $a_result = DllCall($hdll, "BOOLEAN", "CursorNext", "ptr", $ptr_cursor, "ptr*", $_resultptr)
 	If Not($a_result[0]) Then
 		return $a_result[0]
@@ -129,12 +130,13 @@ EndFunc
 Func CursorDestroy($ptr_cursor)
 	DllCall($hdll, "ptr", "CursorDestroy", "ptr", $ptr_cursor)
 EndFunc
+
 ;;
 ;; HELPERS
 ;;
-Func MakeWstrPtr(ByRef $out,$str_data)
-	;~ ByRef Explained: https://www.autoitscript.com/forum/topic/212582-problems-when-returning-dllstructgetptr-from-function/
-	Local $_struct = DllStructCreate("wchar [" & StringLen($str_data) + 1 & "]") ; +1 for null terminator
-	DllStructSetData($_struct, 1, $str_data)
-	$out = $_struct
+Func __MakeWstrPtr($s_str, ByRef $struct)
+    $struct = DllStructCreate("wchar [" & StringLen($s_str) + 1 & "]") ; +1 for null terminator
+	DllStructSetData($struct, 1, $s_str)
+    return DllStructGetPtr($struct)
 EndFunc
+
