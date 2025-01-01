@@ -1,5 +1,7 @@
 #include "pch.h" //windows.h
 #include <iostream> 
+#include <fstream>
+#include <time.h>
 #include <string>
 #include <cwchar> // For wide character functions
 
@@ -69,12 +71,65 @@ extern "C"
     DECLDIR void* CursorDestroy(mongoc_cursor_t* cursor) {
         return impl::_CursorDestroy(cursor);
     }
+
+    DECLDIR void SetLogFile(wchar_t* filePath) {
+        return mong::_setLogHandler(filePath);
+    }
 }
 
+namespace mong {
+    /**
+    * Redirect logs to file if provided
+    */
+    std::string currentLogPath = NULL;
+
+    void logHandler(mongoc_log_level_t log_level,
+            const char* log_domain,
+            const char* message,
+            void* user_data)
+    {
+        /* smaller values are more important */
+        //if (log_level < MONGOC_LOG_LEVEL_INFO) {
+
+        mongoc_log_default_handler(log_level, log_domain, message, user_data);
+        
+        char buff[100];
+        time_t now = time(0);
+        struct tm sTm;
+        if (localtime_s(&sTm, &now) == 0) { // Ensure success
+            strftime(buff, sizeof(buff), "%Y-%m-%d %H:%M:%S", &sTm);
+        }
+        else {
+            snprintf(buff, sizeof(buff), "unknown time"); // Fallback in case of error
+        }
+
+        std::ofstream out(currentLogPath.c_str(), std::ios::app);
+        out << buff << " " << log_domain << log_level << " " << message << endl;
+        out.close();
+        //}
+    }
+
+    void _setLogHandler(wchar_t* filePath) {
+        if (!utils::is_valid_wstring(filePath)) {
+            fprintf(stderr,
+                "Cannot set LogHandler, determinde invalid FilePath Pointer.");
+            SetLastError(MONGOC_ERROR_STREAM_INVALID_TYPE);
+            return;
+        }
+        currentLogPath = utils::wide_string_to_string(filePath);
+        mongoc_log_set_handler(logHandler, NULL);
+    }
+
+}
 
 namespace impl {
 
-    mongoc_collection_t* _CreateCollection(wchar_t* utf16_conn_str, wchar_t* db_name, wchar_t* collection_name) {
+    /**
+    * CreateCollection must be used before calling any other function to retrieve the collection ptr
+    */
+    mongoc_collection_t* _CreateCollection(wchar_t* utf16_conn_str, 
+                                        wchar_t* db_name, 
+                                        wchar_t* collection_name) {
      
         try {
             mongoc_init();
@@ -255,7 +310,6 @@ namespace impl {
     {
         /* returns cursor, caller needs to destroy it */
         bson_t* filter;
-        const bson_t* doc;
         bson_error_t error;
         if (!utils::is_valid_wstring(utf_16_options)) {
             utf_16_options = (wchar_t*)L"{}";

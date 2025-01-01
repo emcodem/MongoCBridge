@@ -19,6 +19,10 @@ Local $projection_wf_id = '{"projection": {"path": 1,"wf_id": 1},"sort": {"wf_id
 
 $bigjsonstr = FileRead($bigjsonstr)
 Local $hdll = DllOpen($g_sFileDll)
+
+
+SetLogFile("C:\temp\mongolog.log")
+
 Local $ptr_mongocollection = CreateCollection($s_mongo_url, $s_mongo_database_name, $s_mongo_collection_name)
 
 InsertOne($ptr_mongocollection,$small_jsonstr)
@@ -53,12 +57,19 @@ UpdateOne($ptr_mongocollection, '{"path":"/folder/subfolder/fname.json"}','{"$se
 ;;
 ;; MongoBridge Functions
 ;;
+Func SetLogFile($s_filepath)
+	Local $_s1
+	Local $_path = __MakeWstrPtr($s_filepath,$_s1)
+	DllCall($hdll, "NONE", "SetLogFile", "ptr", $s_filepath)
+	ConsoleWrite("SetLogFile Error: " & _WinAPI_GetLastError() & @CRLF)
+EndFunc
+
 Func CreateCollection($s_mongoconnectionstr, $s_mongo_database_name, $s_mongo_collection_name)
 	;~ if DB is offline, we still get a valid collection that works once the db comes online
 	Local $_s1,$_s2,$_s3
 	Local $constr_ptr  = __MakeWstrPtr($s_mongoconnectionstr,$_s1)
 	Local $dbname_ptr  = __MakeWstrPtr($s_mongo_database_name,$_s2)
-	Local $colname_ptr = __MakeWstrPtr($s_mongo_collection_name,$s_3)
+	Local $colname_ptr = __MakeWstrPtr($s_mongo_collection_name,$_s3)
 	Local $a_result = DllCall($hdll, "ptr", "CreateCollection", "ptr", $constr_ptr,"ptr", $dbname_ptr,"ptr", $colname_ptr);
 	ConsoleWrite("CreateCollection: " & $a_result[0] & " Error: " & _WinAPI_GetLastError() & @CRLF)
 	return $a_result[0]
@@ -95,7 +106,7 @@ EndFunc
 Func DeleteOne($ptr_mongocollection, $s_query)
 	;~returns 1 if 1 document was deleted, otherwise 0
 	Local $_s1;
-	Local $_searchptr 	= __MakeWstrPtr($_searchptr,$_s1)
+	Local $_searchptr 	= __MakeWstrPtr($s_query,$_s1)
 	Local $a_result 	= DllCall($hdll, "int", "DeleteOne", "ptr", $ptr_mongocollection, "ptr", $_searchptr);
 	ConsoleWrite("DeleteOne: " & $a_result[0] & " Error: " & _WinAPI_GetLastError() & @CRLF)
 	return $a_result[0]
@@ -104,8 +115,8 @@ EndFunc
 Func FindMany($ptr_mongocollection, $s_query, $s_opts)
 	;~ returns pointer to mongo cursor, use CursorNext and CursorDestroy for interaction
 	Local $_s1,$_s2
-	Local $_searchptr 	= __MakeWstrPtr($_searchptr,$_s1)
-	Local $_searchopts 	= __MakeWstrPtr($_searchopts,$_s2)
+	Local $_searchptr 	= __MakeWstrPtr($s_query,$_s1)
+	Local $_searchopts 	= __MakeWstrPtr($s_opts,$_s2)
 	Local $a_result = DllCall($hdll, "ptr", "FindMany", "ptr", $ptr_mongocollection, "ptr", $_searchptr, "ptr", $_searchopts);
 	ConsoleWrite("FindMany Cursor Ptr: " & $a_result[0] & " Error: " & _WinAPI_GetLastError() & @CRLF)
 	return $a_result[0]

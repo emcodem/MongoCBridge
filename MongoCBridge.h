@@ -10,6 +10,7 @@ extern "C"
 
     DECLDIR wchar_t* Echo( wchar_t* utf16String);  // Function takes a pointer to MyStructure
 
+    DECLDIR void        SetLogFile(wchar_t* filepath);
     DECLDIR mongoc_collection_t* CreateCollection(wchar_t* utf16_conn_str, wchar_t* db_name, wchar_t* collection_name);
     DECLDIR int         InsertOne(mongoc_collection_t* c, wchar_t* utf16String);
     DECLDIR wchar_t*    FindOne(mongoc_collection_t* c, wchar_t* query, wchar_t* utf_16_options);
@@ -33,4 +34,8 @@ namespace impl {
     bool        _CursorNext(mongoc_cursor_t* cursor, wchar_t*& result);
     void*       _CursorDestroy(mongoc_cursor_t* cursor);
    
+}
+
+namespace mong {
+    void _setLogHandler(wchar_t* filePath);
 }
