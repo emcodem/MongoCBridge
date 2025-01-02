@@ -1,7 +1,37 @@
 #include "pch.h"
 #include "utils.h"
+#include <mongoc/mongoc.h>
+#include "MongoCBridge.h"
+#include <cwchar> 
+#include <cstring>
+#include "common.h"
 
 namespace utils {
+
+    void bsonErrtoStruct(bson_error_t error, ErrorStruct* err) {
+        err->code = error.code;
+        wcscpy_s(err->message, BSON_ERROR_BUFFER_SIZE, utils::charToWChar(error.message));
+    }
+
+    void charErrtoStruct(int code, const char* msg, ErrorStruct* err) {
+        err->code = code;
+        wcscpy_s(err->message, BSON_ERROR_BUFFER_SIZE, utils::charToWChar(msg));
+    }
+
+    const wchar_t* charToWChar(const char* message) {
+        // Get the length of the message
+        size_t len = std::strlen(message);
+        wchar_t* wideMessage = new wchar_t[len + 1]; // +1 for null terminator
+        size_t i;
+        for (i = 0; i < len; ++i) {
+            wideMessage[i] = static_cast<wchar_t>(message[i]);
+        }
+
+        // Null-terminate the wide string
+        wideMessage[i] = L'\0';
+
+        return wideMessage;
+    }
 
     std::string wide_string_to_string(const std::wstring& wide_string)
     {
@@ -94,4 +124,20 @@ namespace utils {
         (void)length;  // Avoid unused variable warning if needed
         return 1;  // Valid string
     }
+
+    const char* getLogLevelStr(mongoc_log_level_t log_level) {
+        switch (log_level) {
+        case MONGOC_LOG_LEVEL_ERROR:    return "ERROR";
+        case MONGOC_LOG_LEVEL_CRITICAL: return "CRITICAL";
+        case MONGOC_LOG_LEVEL_WARNING:  return "WARNING";
+        case MONGOC_LOG_LEVEL_MESSAGE:  return "MESSAGE";
+        case MONGOC_LOG_LEVEL_INFO:     return "INFO";
+        case MONGOC_LOG_LEVEL_DEBUG:    return "DEBUG";
+        case MONGOC_LOG_LEVEL_TRACE:    return "TRACE";
+        default:                        return "UNKNOWN";
+        }
+    }
+
+
+
 }

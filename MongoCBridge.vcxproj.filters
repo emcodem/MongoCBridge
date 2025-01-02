@@ -7,14 +7,16 @@
     <ClCompile Include="utils.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="pch.h" />
-    <ClInclude Include="framework.h">
+    <ClInclude Include="common.h">
       <Filter>headers</Filter>
     </ClInclude>
     <ClInclude Include="MongoCBridge.h">
       <Filter>headers</Filter>
     </ClInclude>
     <ClInclude Include="utils.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="pch.h">
       <Filter>headers</Filter>
     </ClInclude>
   </ItemGroup>
