@@ -121,14 +121,14 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;MONGOCBRIDGE_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MONGOCBRIDGE_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalIncludeDirectories>$(ProjectDir)\Dependencies\mongo-cxx-driver\include\mongocxx\v_noabi;$(ProjectDir)\Dependencies\mongo-c-driver\include\libbson-1.0;$(ProjectDir)\Dependencies\mongo-cxx-driver\include\bsoncxx\v_noabi;$(ProjectDir)\Dependencies\mongo-c-driver\include\libmongoc-1.0;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
-      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -137,6 +137,9 @@
       <AdditionalDependencies>$(ProjectDir)\Dependencies\mongo-c-driver\lib\bson-1.0.lib;$(ProjectDir)\Dependencies\mongo-c-driver\lib\mongoc-1.0.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(ProjectDir)\Dependencies\mongo-c-driver\lib\</AdditionalLibraryDirectories>
     </Link>
+    <Manifest>
+      <AdditionalManifestFiles>$(SolutionDir)\manifest.manifest</AdditionalManifestFiles>
+    </Manifest>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
