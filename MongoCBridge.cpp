@@ -23,14 +23,15 @@ extern "C"
         size_t prefixLength = std::wcslen(prefix);
         size_t inputLength = std::wcslen(utf16String);
         wchar_t* result = new wchar_t[prefixLength + inputLength + 1]; // +1 for null terminator
+
         //create a new wchar_t concatting prefix and original string
         wcscpy_s(result, prefixLength + 1, prefix);
-        wcscat_s(result, prefixLength + inputLength + 1, utf16String); // +1 for the null terminator
+        wcscat_s(result, prefixLength + inputLength + 1, utf16String);
         return result; // Caller is responsible for freeing the memory
     }
 
-    DECLDIR void SetLogFile(wchar_t* filePath) {
-        return impl::_setLogHandler(filePath);
+    DECLDIR void SetLogFile(wchar_t* filePath, struct ErrorStruct* err) {
+        return impl::_setLogHandler(filePath,err);
     }
 
     DECLDIR void* CursorDestroy(mongoc_cursor_t* cursor) {
@@ -107,7 +108,6 @@ namespace impl {
      
         try {
             
-            //wcscpy_s(err->message, 1024, L"yip");
             mongoc_init();
             std::string connstr;
             mongoc_database_t* database;
@@ -233,13 +233,15 @@ namespace impl {
                 bson_t* doc = bson_new_from_data(data, length);
                 bson_t** new_docs = (bson_t**)realloc(docs, (doc_count + 1) * sizeof(bson_t*));
                 if (!new_docs) {
+                    // Exit on allocation failure
                     MONGOC_ERROR("_InsertMany Memory allocation failed for docs array.\n");
+                    utils::charErrtoStruct(1, "_InsertMany Memory allocation failed for docs array.\n", err);
                     bson_destroy(doc);
-                    break;  // Exit on allocation failure
+                    break;  
                 }
-
+                // Add the new document to the array
                 docs = new_docs;
-                docs[doc_count] = doc;  // Add the new document to the array
+                docs[doc_count] = doc;  
                 doc_count++;
             }
             mongoc_collection_insert_many(c, (const bson_t**)docs, doc_count, NULL, NULL, NULL);
@@ -264,7 +266,6 @@ namespace impl {
         bson_t* filter;
         const bson_t* doc;
         bson_error_t error;
-        //bson_t* filter = BCON_NEW("filename", BCON_UTF8("Processors\\db\\configs\\workflows\\20230625-1518-1896-1790-0dda9dfc0f34.json"));
         if (!utils::is_valid_wstring(utf_16_options)) {
             utf_16_options = (wchar_t*)L"{}";
         }
@@ -285,7 +286,7 @@ namespace impl {
 
         if (mongoc_cursor_error(cursor, &error)) {
             MONGOC_ERROR("mongoc_collection_find_with_opts Error: %s\n", error.message);
-            utils::bsonErrtoStruct(error, err); //ensure error is set
+            utils::bsonErrtoStruct(error, err);
             return 0;
         }
         //if no result found, return empty result
@@ -319,7 +320,7 @@ namespace impl {
         bson_t* reply       = bson_new();
 
         if (!mongoc_collection_update_one(c, selector, update, opts, reply, &error)) {
-            utils::bsonErrtoStruct(error, err); //ensure error is set
+            utils::bsonErrtoStruct(error, err); 
             MONGOC_ERROR("update failed: %s\n", error.message);
             return NULL;
         }
@@ -355,14 +356,15 @@ namespace impl {
         /* returns cursor, caller needs to destroy it */
         bson_t* filter;
         bson_error_t error;
+
         if (!utils::is_valid_wstring(utf_16_options)) {
             utf_16_options = (wchar_t*)L"{}";
         }
-        bson_t* opts = utils::wchar_to_bson_t(utf_16_options);
 
-        //bson_t* filter = BCON_NEW("filename", BCON_UTF8("Processors\\db\\configs\\workflows\\20230625-1518-1896-1790-0dda9dfc0f34.json"));
+        bson_t* opts = utils::wchar_to_bson_t(utf_16_options);
         std::string utf8_query = utils::wide_string_to_string(utf16_query_json);
         filter = bson_new_from_json((const uint8_t*)utf8_query.c_str(), utf8_query.size(), &error);
+
         if (error.code) {
             MONGOC_ERROR("_FindMany error: %s\n", error.message);
             utils::bsonErrtoStruct(error, err);
@@ -426,10 +428,24 @@ namespace impl {
 
     void* _CursorDestroy(mongoc_cursor_t* cursor)
     {
-        mongoc_cursor_destroy(cursor);
+        if (cursor) {
+            mongoc_cursor_destroy(cursor);
+        }
         return NULL;
     }
 
+    const char* getLogLevelStr(mongoc_log_level_t log_level) {
+        switch (log_level) {
+        case MONGOC_LOG_LEVEL_ERROR:    return "ERROR";
+        case MONGOC_LOG_LEVEL_CRITICAL: return "CRITICAL";
+        case MONGOC_LOG_LEVEL_WARNING:  return "WARNING";
+        case MONGOC_LOG_LEVEL_MESSAGE:  return "MESSAGE";
+        case MONGOC_LOG_LEVEL_INFO:     return "INFO";
+        case MONGOC_LOG_LEVEL_DEBUG:    return "DEBUG";
+        case MONGOC_LOG_LEVEL_TRACE:    return "TRACE";
+        default:                        return "UNKNOWN";
+        }
+    }
 
     std::string currentLogPath;
 
@@ -438,8 +454,7 @@ namespace impl {
         const char* message,
         void* user_data)
     {
-        //call default handler (prints to stderr)
-        //mongoc_log_default_handler(log_level, log_domain, message, user_data);
+        //error callback from mongoc, only used when _setLogHandler was called.
 
         if (!currentLogPath.size()) {
             return;
@@ -459,7 +474,8 @@ namespace impl {
         //print to log file
         FILE* logFile = nullptr;
         errno_t err = fopen_s(&logFile, currentLogPath.c_str(), "a");
-        if (GetLastError() == 183) { //todo: find out why fopen_S always returns 183 when file exists (which it usually does)
+        //todo: find out why fopen_S always returns 183 when file exists (which it usually does)
+        if (GetLastError() == 183) { 
             SetLastError(0); //ignore error
         }
         if (err != 0 || logFile == nullptr) {
@@ -472,20 +488,20 @@ namespace impl {
         bool endsWithNewline = message[strlen(message) - 1] == '\n';
 
         if (endsWithNewline) {
-            fprintf(logFile, "%s\t%s\t%s\t%s", buff, log_domain, utils::getLogLevelStr(log_level), message);
+            fprintf(logFile, "%s\t%s\t%s\t%s", buff, log_domain, getLogLevelStr(log_level), message);
         }
         else {
-            fprintf(logFile, "%s\t%s\t%s\t%s\n", buff, log_domain, utils::getLogLevelStr(log_level), message);
+            fprintf(logFile, "%s\t%s\t%s\t%s\n", buff, log_domain, getLogLevelStr(log_level), message);
         }
 
         fclose(logFile);
     }
 
-    void _setLogHandler(wchar_t* filePath) {
+    void _setLogHandler(wchar_t* filePath, struct ErrorStruct* err) {
         if (!utils::is_valid_wstring(filePath)) {
             MONGOC_ERROR(
                 "Cannot set LogHandler, determined invalid FilePath Pointer.");
-            SetLastError(MONGOC_ERROR_STREAM_INVALID_TYPE);
+            utils::charErrtoStruct(1, "Cannot set LogHandler, determined invalid FilePath Pointer.", err);
             return;
         }
 
@@ -498,13 +514,15 @@ namespace impl {
 
 }
 
-/* winmain and main are only used when compiled as commandline exe instead of dll for testing*/
+/* winmain and main are only used when compiled as commandline exe instead of dll for testing */
 int main(int argc, char* argv[]) {
     //when started from commandline, this is the entry point
-    const wchar_t* constr   = L"mongodb://localhost:27017"; // it is not possible to use wchar_t* when initializing the variable by string literal
+    // it is not possible to use wchar_t* when initializing the variable by string literal
+    const wchar_t* constr   = L"mongodb://localhost:27017"; 
     wchar_t* modifiable_str = new wchar_t[wcslen(constr) + 1];
     size_t prefixLength     = std::wcslen(modifiable_str);
-    wcscpy_s(modifiable_str, prefixLength, constr); //just because we should not cast const wchar_t to wchar_t
+    //just because we should not cast const wchar_t to wchar_t
+    wcscpy_s(modifiable_str, prefixLength, constr); 
 
     //impl::_ConnectDatabase(modifiable_str);
     const wchar_t* prefix = L"{\"hello\":\"worldöy\"}";

@@ -1,12 +1,10 @@
 #include <wchar.h>
 #define DECLDIR __declspec(dllexport)
 
+
 #include <mongoc/mongoc.h>
 
 #include "utils.h"
-
-
-
 
 extern "C"
 {
@@ -14,7 +12,7 @@ extern "C"
 
     DECLDIR wchar_t* Echo( wchar_t* utf16String);  // Function takes a pointer to MyStructure
 
-    DECLDIR void        SetLogFile(wchar_t* filepath);
+    DECLDIR void        SetLogFile(wchar_t* filepath, struct ErrorStruct* err);
     DECLDIR void        CloseCollection(mongoc_collection_t* c);
     DECLDIR void*       CursorDestroy(mongoc_cursor_t* cursor);
 
@@ -70,8 +68,11 @@ extern "C"
 namespace impl {
     // Implementation
 
-    mongoc_collection_t* _CreateCollection(wchar_t* utf16_conn_str, wchar_t* db_name, wchar_t* collection_name, struct ErrorStruct* err);
+    void        _setLogHandler(wchar_t* filePath, struct ErrorStruct* err);
     void        _CloseCollection(mongoc_collection_t* c);
+    void*       _CursorDestroy(mongoc_cursor_t* cursor);
+
+    mongoc_collection_t* _CreateCollection(wchar_t* utf16_conn_str, wchar_t* db_name, wchar_t* collection_name, struct ErrorStruct* err);
     int         _InsertOne(mongoc_collection_t* c, wchar_t* utf16String, struct ErrorStruct* err);
     bool        _InsertMany(mongoc_collection_t* c, wchar_t* utf16Doc, struct ErrorStruct* err);
     wchar_t*    _FindOne(mongoc_collection_t* c, wchar_t* query, wchar_t* utf_16_options, struct ErrorStruct* err);
@@ -79,7 +80,7 @@ namespace impl {
     int         _DeleteOne(mongoc_collection_t* c, wchar_t* query, struct ErrorStruct* err);
     mongoc_cursor_t* _FindMany(mongoc_collection_t* c, wchar_t* utf16_query_json, wchar_t* utf_16_options, struct ErrorStruct* err);
     bool        _CursorNext(mongoc_cursor_t* cursor, wchar_t*& result, struct ErrorStruct* err);
-    void*       _CursorDestroy(mongoc_cursor_t* cursor);
+    
     wchar_t*    _ClientCommandSimple(mongoc_collection_t* c, wchar_t* utf_16_command, struct ErrorStruct* err);
-    void        _setLogHandler(wchar_t* filePath);
+    
 }

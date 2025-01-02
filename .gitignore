@@ -6,7 +6,9 @@
 ./MongoCBridge/
 *.idb
 *FileListAbsolute.txt
-
+MongoCBridge.lib
+MongoCBridge.exp
+*.recipe
 # User-specific files
 *.rsuser
 *.suo

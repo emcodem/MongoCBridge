@@ -134,11 +134,12 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>$(ProjectDir)\Dependencies\mongo-c-driver\lib\bson-1.0.lib;$(ProjectDir)\Dependencies\mongo-c-driver\lib\mongoc-1.0.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(ProjectDir)\Dependencies\mongo-c-driver\lib\bson-1.0.lib;$(ProjectDir)\Dependencies\mongo-c-driver\lib\mongoc-1.0.lib;ws2_32.lib;Secur32.lib;Crypt32.lib;BCrypt.lib;libucrt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(ProjectDir)\Dependencies\mongo-c-driver\lib\</AdditionalLibraryDirectories>
     </Link>
     <Manifest>
-      <AdditionalManifestFiles>$(SolutionDir)\manifest.manifest</AdditionalManifestFiles>
+      <AdditionalManifestFiles>
+      </AdditionalManifestFiles>
     </Manifest>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -151,6 +152,8 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>$(ProjectDir)\Dependencies\mongo-cxx-driver\include\mongocxx\v_noabi;$(ProjectDir)\Dependencies\mongo-c-driver\include\libbson-1.0;$(ProjectDir)\Dependencies\mongo-cxx-driver\include\bsoncxx\v_noabi;$(ProjectDir)\Dependencies\mongo-c-driver\include\libmongoc-1.0;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -158,6 +161,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
+      <AdditionalDependencies>$(ProjectDir)\Dependencies\mongo-c-driver\lib\bson-1.0.lib;$(ProjectDir)\Dependencies\mongo-c-driver\lib\mongoc-1.0.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

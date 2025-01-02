@@ -47,7 +47,7 @@ namespace utils {
         }
 
         std::string result(size_needed, 0);
-        WideCharToMultiByte(CP_UTF8, 0, wide_string.data(), (int)wide_string.size(), result.data(), size_needed, nullptr, nullptr);
+        WideCharToMultiByte(CP_UTF8, 0, wide_string.data(), (int)wide_string.size(),(LPSTR) result.data(), size_needed, nullptr, nullptr);
         return result;
     }
 
@@ -69,8 +69,8 @@ namespace utils {
         static thread_local std::wstring result; // Thread-local storage to handle thread safety
         result.resize(size_needed);
 
-        MultiByteToWideChar(CP_UTF8, 0, narrow_string.data(), (int)narrow_string.size(), result.data(), size_needed);
-        return result.data(); // Return a C-style wide string
+        MultiByteToWideChar(CP_UTF8, 0, narrow_string.data(), (int)narrow_string.size(), (LPWSTR) result.data(), size_needed);
+        return (wchar_t*)result.data(); // Return a C-style wide string
     }
 
     bson_t* wchar_to_bson_t(wchar_t* what) {
@@ -125,18 +125,6 @@ namespace utils {
         return 1;  // Valid string
     }
 
-    const char* getLogLevelStr(mongoc_log_level_t log_level) {
-        switch (log_level) {
-        case MONGOC_LOG_LEVEL_ERROR:    return "ERROR";
-        case MONGOC_LOG_LEVEL_CRITICAL: return "CRITICAL";
-        case MONGOC_LOG_LEVEL_WARNING:  return "WARNING";
-        case MONGOC_LOG_LEVEL_MESSAGE:  return "MESSAGE";
-        case MONGOC_LOG_LEVEL_INFO:     return "INFO";
-        case MONGOC_LOG_LEVEL_DEBUG:    return "DEBUG";
-        case MONGOC_LOG_LEVEL_TRACE:    return "TRACE";
-        default:                        return "UNKNOWN";
-        }
-    }
 
 
 

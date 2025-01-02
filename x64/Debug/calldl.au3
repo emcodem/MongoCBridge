@@ -1,11 +1,20 @@
 #AutoIt3Wrapper_UseX64=Y
 ;#AutoIt3Wrapper_Au3Check_Parameters=-d -w 1 -w 2 -w 3 -w- 4 -w 5 -w 6 -w- 7
+
+#include-once
+
 #include <C:\dev\FFAStrans\Processors\JSON.au3>
 #include <WinAPIError.au3>
 #include <WinAPIMisc.au3>
+#include <WinAPISys.au3>
 #include <Array.au3>
 #include <MsgBoxConstants.au3>
 
+;MongoCbridge.dll is looking for mongoc dlls only in path and executeable folder
+;We force it to search them relative to this script
+_WinAPI_SetDllDirectory (@ScriptDir & "\Debug")
+Global CONST $__hMongo_1_29_1 = DllOpen(@ScriptDir & "\Debug\MongoCBridge.dll")
+_WinAPI_SetDllDirectory ()
 ;C:\Users\Gam3r1\AppData\Local\Temp\mongod.exe --dbpath C:\temp\filebrdg
 Opt("MustDeclareVars", 1)
 
@@ -17,15 +26,14 @@ Exit
 #Region mongodb.au3 - TESTS
 
 Func Test()
-	Local $g_sFileDll    = 'C:\dev\MongoCBridge\x64\Debug\MongoCBridge.dll'
-	Local $hDll = DllOpen($g_sFileDll)
+
 	Local $s_mongo_url 		= "mongodb://localhost:27017"
 	Local $s_mongo_database_name 	= "testdb"
 	Local $s_mongo_collection_name 	= "testcollection"
 	Local $sResult
 
 	;Initialize mongodb driver
-	Local $pMongocollection = CreateCollection($hDll, $s_mongo_url, $s_mongo_database_name, $s_mongo_collection_name)
+	Local $pMongocollection = CreateCollection($s_mongo_url, $s_mongo_database_name, $s_mongo_collection_name)
 	If (@error) Then
 		ConsoleWrite("TEST ERROR: CreateCollection: " & $sResult)
 		Exit 1
@@ -33,7 +41,7 @@ Func Test()
 	ConsoleWrite("CreateCollection Success" & @CRLF)
 
 	;Check db status
-	$sResult = ClientCommandSimple($hDll, $pMongocollection,'{"ping": "1"}')  ;{"create": "YEY"}
+	$sResult = ClientCommandSimple($pMongocollection,'{"ping": "1"}')  ;{"create": "YEY"}
 	If (@error) Then
 		ConsoleWrite("TEST ERROR: ClientCommandSimple ping: " & $sResult)
 		Exit 1
@@ -41,7 +49,7 @@ Func Test()
 	ConsoleWrite("ClientCommandSimple ping Success" & @CRLF)
 
 	;Drop test collection just in case
-	$sResult = ClientCommandSimple($hDll, $pMongocollection, '{"drop": "'&$s_mongo_collection_name&'"}')  ;{"create": "YEY"}
+	$sResult = ClientCommandSimple($pMongocollection, '{"drop": "'&$s_mongo_collection_name&'"}')  ;{"create": "YEY"}
 	If (@error) Then
 		ConsoleWrite("TEST ERROR: ClientCommandSimple drop: " & $sResult)
 		Exit 1
@@ -49,7 +57,7 @@ Func Test()
 	ConsoleWrite("ClientCommandSimple drop Success" & @CRLF)
 
 	;Create test collection
-	$sResult = ClientCommandSimple($hDll, $pMongocollection, '{"create": "'&$s_mongo_collection_name&'"}')  ;{"create": "YEY"}
+	$sResult = ClientCommandSimple($pMongocollection, '{"create": "'&$s_mongo_collection_name&'"}')  ;{"create": "YEY"}
 	If (@error) Then
 		ConsoleWrite("TEST ERROR: ClientCommandSimple create: " & $sResult)
 		Exit 1
@@ -57,53 +65,61 @@ Func Test()
 	ConsoleWrite("ClientCommandSimple create Success" & @CRLF)
 
 	;list indexes
-	$sResult = ClientCommandSimple($hDll, $pMongocollection, '{"listIndexes": "'&$s_mongo_collection_name&'"}' )  ;{"create": "YEY"}
+	$sResult = ClientCommandSimple($pMongocollection, '{"listIndexes": "'&$s_mongo_collection_name&'"}' )  ;{"create": "YEY"}
 	If (@error) Then
 		ConsoleWrite("TEST ERROR: ClientCommandSimple listIndexes: " & $sResult)
 		Exit 1
 	EndIf
 	ConsoleWrite("ClientCommandSimple listIndexes Success: " & $sResult & @CRLF)
 
-	$sResult = InsertOne($hDll, $pMongocollection, '{"application":"ffastrans","boss":"steinar"}')
+	$sResult = InsertOne($pMongocollection, '{"application":"ffastrans","boss":"steinar"}')
 	If (@error) Then
 		ConsoleWrite("TEST ERROR: InsertOne: " & $sResult & @CRLF)
 		Exit 1
 	EndIf
 	ConsoleWrite("InsertOne Success" & @CRLF)
 
-	$sResult = UpdateOne($hDll, $pMongocollection,"{}",'{"$set":{"developers":["emcodem","FranceBB","momocampo"]}}','{"upsert":false}')
+	$sResult = InsertOne($pMongocollection, '[1,2]')
+	If (@error) Then
+		ConsoleWrite("TEST ERROR: InsertOne Array: " & $sResult & @CRLF)
+		Exit 1
+	EndIf
+	ConsoleWrite("InsertOne Array Success" & @CRLF)
+
+
+	$sResult = UpdateOne($pMongocollection,"{}",'{"$set":{"developers":["emcodem","FranceBB","momocampo"]}}','{"upsert":false}')
 	If (@error) Then
 		ConsoleWrite("TEST ERROR: UpdateOne: " & $sResult & @CRLF)
 		Exit 1
 	EndIf
 	ConsoleWrite("ClientCommandSimple listIndexes Success: " & $sResult & @CRLF)
 
-	$sResult = InsertMany($hDll, $pMongocollection,'[{"application":"windows"},{"application":"macos"}]')
+	$sResult = InsertMany($pMongocollection,'[{"application":"windows"},{"application":"macos"}]')
 	If (@error) Then
 		ConsoleWrite("TEST ERROR: InsertMany: " & $sResult & @CRLF)
 		Exit 1
 	EndIf
 	ConsoleWrite("InsertMany Success: " & $sResult & @CRLF)
 
-	$sResult =  DeleteOne($hDll, $pMongocollection,'{"application":"macos"}')
+	$sResult =  DeleteOne($pMongocollection,'{"application":"macos"}')
 	If (@error) Then
 		ConsoleWrite("TEST ERROR: DeleteOne: " & $sResult & @CRLF)
 		Exit 1
 	EndIf
 	ConsoleWrite("DeleteOne Success: " & $sResult & @CRLF)
 
-	$sResult = FindMany($hDll, $pMongocollection, "{}", "{}")
+	$sResult = FindMany($pMongocollection, "{}", "{}")
 	If (@error) Then
 		ConsoleWrite("TEST ERROR: FindMany: " & $sResult & @CRLF)
 		Exit 1
 	EndIf
 	;Iterate over cursor
 	Local $sNext
-	While (CursorNext($hDll,$sResult,$sNext))
+	While (CursorNext($sResult,$sNext))
 		ConsoleWrite("FindMany Next: " & $sNext & @CRLF)
 	WEnd
 	;Release cursor
-	CursorDestroy($hDll, $sResult)
+	CursorDestroy($sResult)
 
 EndFunc
 
@@ -121,7 +137,7 @@ EndFunc
 ; Author ........: emcodem (emcodem@ffastrans.com)
 ; Modified.......:
 ; Remarks .......:  Includes only logs of this driver, not mongodb logs.
-;					All Hosts and Collections you open with the same $hDll handle will go to this log.
+;					All Hosts and Collections you open with the same $__hMongo_1_29_1 handle will go to this log.
 ;					Disables STDERR output of the log lines.
 ;				   	Each Log is done in a mutex automatically by the mongoc api, it should be thread safe.
 ;				   	The log file is opened and closed for every line.
@@ -130,11 +146,14 @@ EndFunc
 ; Link ..........:
 ; Example .......: No
 ; ===============================================================================================================================
-Func SetLogFile($hDll, $sFilepath)
+Func SetLogFile($sFilepath)
 	Local $t1
-	Local $_path	 = __MakeWstrPtr($sFilepath,$t1)
-	DllCall($hdll, "NONE", "SetLogFile", "ptr", $_path)
-	ConsoleWrite("SetLogFile Error: " & _WinAPI_GetLastError() & @CRLF)
+	Local $pPath	= __MakeWstrPtr($sFilepath,$t1)
+	Local $tErr  	= __MakeErrStruct()
+	Local $pErr 	= DllStructGetPtr($tErr)
+	ConsoleWrite($__hMongo_1_29_1)
+	DllCall($__hMongo_1_29_1, "NONE", "SetLogFile", "ptr", $pPath)
+	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : ""
 EndFunc
 
 ; #FUNCTION# ====================================================================================================================
@@ -156,7 +175,7 @@ EndFunc
 ; Link ..........:
 ; Example .......: Yes
 ; ===============================================================================================================================
-Func CreateCollection($hDll, $sMongoconnection, $sMongoDatabaseName, $sMongoCollectionName)
+Func CreateCollection($sMongoconnection, $sMongoDatabaseName, $sMongoCollectionName)
 	;~ if DB is offline, we still get a valid collection that works once the db comes online
 	Local $t1,$t2,$t3
 	Local $pconn	= __MakeWstrPtr($sMongoconnection,	$t1)
@@ -165,7 +184,7 @@ Func CreateCollection($hDll, $sMongoconnection, $sMongoDatabaseName, $sMongoColl
 	Local $tErr  	= __MakeErrStruct()
 	Local $pErr 	= DllStructGetPtr($tErr)
 
-	Local $aResult 	= DllCall($hDll, "ptr", "CreateCollection", "ptr", $pconn,"ptr", $pdb,"ptr", $pcol, "ptr", $pErr)
+	Local $aResult 	= DllCall($__hMongo_1_29_1, "ptr", "CreateCollection", "ptr", $pconn,"ptr", $pdb,"ptr", $pcol, "ptr", $pErr)
 	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : $aResult[0]
 EndFunc
 
@@ -182,13 +201,13 @@ EndFunc
 ; Link ..........:
 ; Example .......: Yes
 ; ===============================================================================================================================
-Func InsertOne($hDll, $pMongocollection, Const ByRef $sJson)
+Func InsertOne($pMongocollection, Const ByRef $sJson)
 	Local $t1
 	Local $pJson 	= __MakeWstrPtr($sJson,$t1)
 	Local $tErr  	= __MakeErrStruct()
 	Local $pErr 	= DllStructGetPtr($tErr)
 
-	Local $aResult 	= DllCall($hDll, "int:cdecl", "InsertOne", "ptr", $pMongocollection, "ptr",$pJson, "ptr", $pErr)
+	Local $aResult 	= DllCall($__hMongo_1_29_1, "int:cdecl", "InsertOne", "ptr", $pMongocollection, "ptr",$pJson, "ptr", $pErr)
 	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : $aResult[0]
 EndFunc
 
@@ -205,13 +224,13 @@ EndFunc
 ; Link ..........:
 ; Example .......: Yes
 ; ===============================================================================================================================
-Func InsertMany($hDll, $pMongocollection, Const ByRef $sJson)
+Func InsertMany($pMongocollection, Const ByRef $sJson)
 	Local $t1
 	Local $pJson 	= __MakeWstrPtr($sJson,$t1)
 	Local $tErr  	= __MakeErrStruct()
 	Local $pErr 	= DllStructGetPtr($tErr)
 
-	Local $aResult 	= DllCall($hDll, "BOOLEAN", "InsertMany", "ptr", $pMongocollection, "ptr",$pJson, "ptr", $pErr)
+	Local $aResult 	= DllCall($__hMongo_1_29_1, "BOOLEAN", "InsertMany", "ptr", $pMongocollection, "ptr",$pJson, "ptr", $pErr)
 	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : $aResult[0]
 EndFunc
 
@@ -230,7 +249,7 @@ EndFunc
 ; Link ..........: https://www.mongodb.com/docs/manual/reference/method/db.collection.updateOne/
 ; Example .......: Yes
 ; ===============================================================================================================================
-Func UpdateOne($hDll, $pMongocollection, $sQuery, $sUpdate, $sOptions)
+Func UpdateOne($pMongocollection, $sQuery, $sUpdate, $sOptions)
 	;~ https://www.mongodb.com/docs/manual/reference/method/db.collection.updateOne/
 	;~ commonly used options: {"upsert":true}
 	;~ returns json str like { "modifiedCount" : 1, "matchedCount" : 1, "upsertedCount" : 0 }
@@ -240,7 +259,7 @@ Func UpdateOne($hDll, $pMongocollection, $sQuery, $sUpdate, $sOptions)
 	Local $pOpt 		= __MakeWstrPtr($sOptions,	$t3)
 	Local $tErr  		= __MakeErrStruct()
 	Local $pErr 		= DllStructGetPtr($tErr)
-	Local $aResult 		= DllCall($hDll, "WSTR", "UpdateOne", "ptr", $pMongocollection, "ptr", $pSearch, "ptr", $pUpdate, "ptr", $pOpt, "ptr", $pErr)
+	Local $aResult 		= DllCall($__hMongo_1_29_1, "WSTR", "UpdateOne", "ptr", $pMongocollection, "ptr", $pSearch, "ptr", $pUpdate, "ptr", $pOpt, "ptr", $pErr)
 	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : $aResult[0]
 EndFunc
 
@@ -258,13 +277,13 @@ EndFunc
 ; Link ..........: https://www.mongodb.com/docs/manual/reference/method/db.collection.findOne/
 ; Example .......: Yes
 ; ===============================================================================================================================
-Func FindOne($hDll, $pMongocollection, $sQuery, $sProjection = "{}")
+Func FindOne($pMongocollection, $sQuery, $sProjection = "{}")
 	Local $t1,$t2
 	Local $pQuery 		= __MakeWstrPtr($sQuery,$t1)
 	Local $pProjection	= __MakeWstrPtr($sProjection,$t2)
 	Local $tErr  		= __MakeErrStruct()
 	Local $pErr 		= DllStructGetPtr($tErr)
-	Local $aResult 		= DllCall($hDll, "WSTR", "FindOne", "ptr", $pMongocollection, "ptr", $pQuery, "ptr", $pProjection, "ptr", $pErr ) ;the C side prints Hello to ConsoleRead
+	Local $aResult 		= DllCall($__hMongo_1_29_1, "WSTR", "FindOne", "ptr", $pMongocollection, "ptr", $pQuery, "ptr", $pProjection, "ptr", $pErr ) ;the C side prints Hello to ConsoleRead
 	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : $aResult[0]
 EndFunc
 
@@ -283,14 +302,13 @@ EndFunc
 ; Link ..........: https://www.mongodb.com/docs/manual/reference/method/db.collection.find/
 ; Example .......: Yes
 ; ===============================================================================================================================
-Func FindMany($hDll, $pMongocollection, $sQuery, $sOpts = "{}")
-	;~ returns pointer to mongo cursor, use CursorNext and CursorDestroy for interaction
+Func FindMany($pMongocollection, $sQuery, $sOpts = "{}")
 	Local $t1,$t2
 	Local $pQuery	 	= __MakeWstrPtr($sQuery,$t1)
 	Local $pOpts 		= __MakeWstrPtr($sOpts,$t2)
 	Local $tErr  		= __MakeErrStruct()
 	Local $pErr 		= DllStructGetPtr($tErr)
-	Local $aResult 		= DllCall($hDll, "ptr", "FindMany", "ptr", $pMongocollection, "ptr", $pQuery, "ptr", $pOpts, "ptr", $pErr);
+	Local $aResult 		= DllCall($__hMongo_1_29_1, "ptr", "FindMany", "ptr", $pMongocollection, "ptr", $pQuery, "ptr", $pOpts, "ptr", $pErr);
 	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : $aResult[0]
 EndFunc
 
@@ -308,13 +326,13 @@ EndFunc
 ; Link ..........: https://www.mongodb.com/docs/manual/reference/method/db.collection.deleteOne/
 ; Example .......: Yes
 ; ===============================================================================================================================
-Func DeleteOne($hDll, $pMongocollection, $sQuery)
+Func DeleteOne($pMongocollection, $sQuery)
 	;~returns 1 if 1 document was deleted, otherwise 0
 	Local $t1;
 	Local $pQuery 		= __MakeWstrPtr($sQuery,$t1)
 	Local $tErr  		= __MakeErrStruct()
 	Local $pErr 		= DllStructGetPtr($tErr)
-	Local $aResult 		= DllCall($hDll, "int", "DeleteOne", "ptr", $pMongocollection, "ptr", $pQuery, "ptr", $pErr)
+	Local $aResult 		= DllCall($__hMongo_1_29_1, "int", "DeleteOne", "ptr", $pMongocollection, "ptr", $pQuery, "ptr", $pErr)
 	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : $aResult[0]
 EndFunc
 
@@ -333,11 +351,12 @@ EndFunc
 ; Link ..........:
 ; Example .......: Yes
 ; ===============================================================================================================================
-Func CursorNext($hDll, $pCursor, ByRef $sNext)
-	Local $pResult 		; pass a pointer to pointer to allow the dll to return a pointer to the memory of the json string
+Func CursorNext($pCursor, ByRef $sNext)
+	Local $tResult = ""		; pass a pointer to pointer to allow the dll to return a pointer to the memory of the json string
+	Local $pResult = DllStructGetPtr($tResult)
 	Local $tErr  		= __MakeErrStruct()
 	Local $pErr 		= DllStructGetPtr($tErr)
-	Local $aResult 		= DllCall($hDll, "BOOLEAN", "CursorNext", "ptr", $pCursor, "ptr*", $pResult, "ptr", $pErr)
+	Local $aResult 		= DllCall($__hMongo_1_29_1, "BOOLEAN", "CursorNext", "ptr", $pCursor, "ptr*", $pResult, "ptr", $pErr)
 	If ($tErr.code <> 0) Then
 		return SetError($tErr.code, $tErr.code, $tErr.message)
 	EndIf
@@ -366,8 +385,8 @@ EndFunc
 ; Link ..........:
 ; Example .......: Yes
 ; ===============================================================================================================================
-Func CursorDestroy($hDll, $ptr_cursor)
-	DllCall($hDll, "ptr", "CursorDestroy", "ptr", $ptr_cursor)
+Func CursorDestroy($ptr_cursor)
+	DllCall($__hMongo_1_29_1, "ptr", "CursorDestroy", "ptr", $ptr_cursor)
 EndFunc
 
 ; #FUNCTION# ====================================================================================================================
@@ -386,14 +405,14 @@ EndFunc
 ;				   https://www.mongodb.com/docs/manual/reference/command/
 ; Example .......: Yes
 ; ===============================================================================================================================
-Func ClientCommandSimple($hDll, $pMongocollection, ByRef $sCmd)
+Func ClientCommandSimple($pMongocollection, ByRef $sCmd)
 	;https://www.mongodb.com/docs/manual/reference/command/
 	Local $t1
 	Local $pCmd 	= __MakeWstrPtr($sCmd,$t1)
 	Local $tErr  	= __MakeErrStruct()
 	Local $pErr 	= DllStructGetPtr($tErr)
 
-	Local $aResult 	= DllCall($hDll, "WSTR", "ClientCommandSimple", "ptr", $pMongocollection, "ptr", $pCmd, "ptr", $pErr);
+	Local $aResult 	= DllCall($__hMongo_1_29_1, "WSTR", "ClientCommandSimple", "ptr", $pMongocollection, "ptr", $pCmd, "ptr", $pErr);
 	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : $aResult[0]
 EndFunc
 

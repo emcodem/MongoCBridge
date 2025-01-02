@@ -1,137 +1,61 @@
 #AutoIt3Wrapper_UseX64=Y
-;#AutoIt3Wrapper_Au3Check_Parameters=-d -w 1 -w 2 -w 3 -w- 4 -w 5 -w 6 -w- 7
-
+Opt("MustDeclareVars", 1)
 #include-once
-
-#include <C:\dev\FFAStrans\Processors\JSON.au3>
-#include <WinAPIError.au3>
 #include <WinAPIMisc.au3>
 #include <WinAPISys.au3>
-#include <Array.au3>
-#include <MsgBoxConstants.au3>
 
-;MongoCbridge.dll is looking for mongoc dlls only in path and executeable folder
-;We force it to search them relative to this script
-_WinAPI_SetDllDirectory (@ScriptDir & "\Debug")
-Global CONST $__hMongo_1_29_1 = DllOpen(@ScriptDir & "\Debug\MongoCBridge.dll")
-_WinAPI_SetDllDirectory ()
-;C:\Users\Gam3r1\AppData\Local\Temp\mongod.exe --dbpath C:\temp\filebrdg
-Opt("MustDeclareVars", 1)
+;#AutoIt3Wrapper_Au3Check_Parameters=-d -w 1 -w 2 -w 3 -w- 4 -w 5 -w 6 -w- 7
 
-;db.createUser({user:'ffastrans', pwd: 'ffasTrans', roles:["userAdminAnyDatabase","readWriteAnyDatabase"]})
-;Local $small_jsonstr = '{"path":"/folder/subfolder/fname.json","wf_id":"0230625-1518-1896-1790-0dda9dfc0f34"}'
+; #INDEX# =======================================================================================================================
+; Title .........: MongoDB Driver for Autoit
+; AutoIt Version : 3.3.10.2
+; Language ......: English
+; Author(s) .....: emcodem
+; Modifiers .....:
+; Forum link ....:
+; Description ...: An example UDF that does very little.
+; ===============================================================================================================================
 
-Test()
-Exit
-#Region mongodb.au3 - TESTS
 
-Func Test()
 
-	Local $s_mongo_url 		= "mongodb://localhost:27017"
-	Local $s_mongo_database_name 	= "testdb"
-	Local $s_mongo_collection_name 	= "testcollection"
-	Local $sResult
 
-	;Initialize mongodb driver
-	Local $pMongocollection = CreateCollection($s_mongo_url, $s_mongo_database_name, $s_mongo_collection_name)
-	If (@error) Then
-		ConsoleWrite("TEST ERROR: CreateCollection: " & $sResult)
-		Exit 1
+; #FUNCTION# ====================================================================================================================
+; Name...........: _Mongo_Init
+; Description ...: Set Filename and Path for Mongo Driver logs
+; Syntax.........: _Mongo_Init($sInstallDir)
+; Parameters ....: $sFilepath - Full File Path, Direcotry must exist
+; Return values .: No return values, use _WinAPI_GetLastError() to check for errors
+; Author ........: emcodem (emcodem@ffastrans.com)
+; Modified.......:
+; Remarks .......:
+;
+;					MongoCbridge.dll resolves mongoc dlls in path and executeable folder
+;					We force it to search them relative to this script
+; Related .......:
+; Link ..........:
+; Example .......: No
+; ===============================================================================================================================
+Func _Mongo_Init($sInstallDir = @ScriptDir & "\include\MongoDB_UDF\")
+	Local $sBridgeDllPath = $sInstallDir & "\dependencies\MongoCBridge.dll"
+	Local $sMongoCDllPath = $sInstallDir & "\dependencies\mongoc_driver_1.29.1"
+	If Not(FileExists ( $sBridgeDllPath )) Then
+		ConsoleWriteError("Not found: " & $sBridgeDllPath)
+		Exit(42)
 	EndIf
-	ConsoleWrite("CreateCollection Success" & @CRLF)
-
-	;Check db status
-	$sResult = ClientCommandSimple($pMongocollection,'{"ping": "1"}')  ;{"create": "YEY"}
+	_WinAPI_SetDllDirectory ($sMongoCDllPath)
+	Global CONST $__hMongo_1_29_1 = DllOpen($sBridgeDllPath)
+	_WinAPI_SetDllDirectory()
 	If (@error) Then
-		ConsoleWrite("TEST ERROR: ClientCommandSimple ping: " & $sResult)
-		Exit 1
+		ConsoleWriteError("MongocBridgeDll")
 	EndIf
-	ConsoleWrite("ClientCommandSimple ping Success" & @CRLF)
-
-	;Drop test collection just in case
-	$sResult = ClientCommandSimple($pMongocollection, '{"drop": "'&$s_mongo_collection_name&'"}')  ;{"create": "YEY"}
-	If (@error) Then
-		ConsoleWrite("TEST ERROR: ClientCommandSimple drop: " & $sResult)
-		Exit 1
-	EndIf
-	ConsoleWrite("ClientCommandSimple drop Success" & @CRLF)
-
-	;Create test collection
-	$sResult = ClientCommandSimple($pMongocollection, '{"create": "'&$s_mongo_collection_name&'"}')  ;{"create": "YEY"}
-	If (@error) Then
-		ConsoleWrite("TEST ERROR: ClientCommandSimple create: " & $sResult)
-		Exit 1
-	EndIf
-	ConsoleWrite("ClientCommandSimple create Success" & @CRLF)
-
-	;list indexes
-	$sResult = ClientCommandSimple($pMongocollection, '{"listIndexes": "'&$s_mongo_collection_name&'"}' )  ;{"create": "YEY"}
-	If (@error) Then
-		ConsoleWrite("TEST ERROR: ClientCommandSimple listIndexes: " & $sResult)
-		Exit 1
-	EndIf
-	ConsoleWrite("ClientCommandSimple listIndexes Success: " & $sResult & @CRLF)
-
-	$sResult = InsertOne($pMongocollection, '{"application":"ffastrans","boss":"steinar"}')
-	If (@error) Then
-		ConsoleWrite("TEST ERROR: InsertOne: " & $sResult & @CRLF)
-		Exit 1
-	EndIf
-	ConsoleWrite("InsertOne Success" & @CRLF)
-
-	$sResult = InsertOne($pMongocollection, '[1,2]')
-	If (@error) Then
-		ConsoleWrite("TEST ERROR: InsertOne Array: " & $sResult & @CRLF)
-		Exit 1
-	EndIf
-	ConsoleWrite("InsertOne Array Success" & @CRLF)
-
-
-	$sResult = UpdateOne($pMongocollection,"{}",'{"$set":{"developers":["emcodem","FranceBB","momocampo"]}}','{"upsert":false}')
-	If (@error) Then
-		ConsoleWrite("TEST ERROR: UpdateOne: " & $sResult & @CRLF)
-		Exit 1
-	EndIf
-	ConsoleWrite("ClientCommandSimple listIndexes Success: " & $sResult & @CRLF)
-
-	$sResult = InsertMany($pMongocollection,'[{"application":"windows"},{"application":"macos"}]')
-	If (@error) Then
-		ConsoleWrite("TEST ERROR: InsertMany: " & $sResult & @CRLF)
-		Exit 1
-	EndIf
-	ConsoleWrite("InsertMany Success: " & $sResult & @CRLF)
-
-	$sResult =  DeleteOne($pMongocollection,'{"application":"macos"}')
-	If (@error) Then
-		ConsoleWrite("TEST ERROR: DeleteOne: " & $sResult & @CRLF)
-		Exit 1
-	EndIf
-	ConsoleWrite("DeleteOne Success: " & $sResult & @CRLF)
-
-	$sResult = FindMany($pMongocollection, "{}", "{}")
-	If (@error) Then
-		ConsoleWrite("TEST ERROR: FindMany: " & $sResult & @CRLF)
-		Exit 1
-	EndIf
-	;Iterate over cursor
-	Local $sNext
-	While (CursorNext($sResult,$sNext))
-		ConsoleWrite("FindMany Next: " & $sNext & @CRLF)
-	WEnd
-	;Release cursor
-	CursorDestroy($sResult)
-
 EndFunc
-
-#EndRegion mongodb.au3 - TESTS
-
 
 #Region mongodb.au3 - Functions
 
 ; #FUNCTION# ====================================================================================================================
-; Name...........: SetLogFile
+; Name...........: _Mongo_SetLogFile
 ; Description ...: Set Filename and Path for Mongo Driver logs
-; Syntax.........: SetLogFile($sFilepath)
+; Syntax.........: _Mongo_SetLogFile($sFilepath)
 ; Parameters ....: $sFilepath - Full File Path, Direcotry must exist
 ; Return values .: No return values, use _WinAPI_GetLastError() to check for errors
 ; Author ........: emcodem (emcodem@ffastrans.com)
@@ -146,10 +70,10 @@ EndFunc
 ; Link ..........:
 ; Example .......: No
 ; ===============================================================================================================================
-Func SetLogFile($sFilepath)
+Func _Mongo_SetLogFile($sFilepath)
 	Local $t1
-	Local $pPath	= __MakeWstrPtr($sFilepath,$t1)
-	Local $tErr  	= __MakeErrStruct()
+	Local $pPath	= __Mongo_MakeWstrPtr($sFilepath,$t1)
+	Local $tErr  	= __Mongo_MakeErrStruct()
 	Local $pErr 	= DllStructGetPtr($tErr)
 	ConsoleWrite($__hMongo_1_29_1)
 	DllCall($__hMongo_1_29_1, "NONE", "SetLogFile", "ptr", $pPath)
@@ -157,9 +81,9 @@ Func SetLogFile($sFilepath)
 EndFunc
 
 ; #FUNCTION# ====================================================================================================================
-; Name...........: CreateCollection
+; Name...........: _Mongo_CreateCollection
 ; Description ...: Initialize Structure, needed for all interactions with mongodb
-; Syntax.........: CreateCollection("mongodb://user@passwd:localhost:27017","mydatabase","mycollection")
+; Syntax.........: _Mongo_CreateCollection("mongodb://user@passwd:localhost:27017","mydatabase","mycollection")
 ; Parameters ....: 	$s_mongoconnectionstr 		- a valid mongodb connection url, optionally can contain username and pwd
 ;					$s_mongo_database_name		- mongo db name
 ;					$s_mongo_collection_name	- mongo collection name
@@ -175,13 +99,13 @@ EndFunc
 ; Link ..........:
 ; Example .......: Yes
 ; ===============================================================================================================================
-Func CreateCollection($sMongoconnection, $sMongoDatabaseName, $sMongoCollectionName)
+Func _Mongo_CreateCollection($sMongoconnection, $sMongoDatabaseName, $sMongoCollectionName)
 	;~ if DB is offline, we still get a valid collection that works once the db comes online
 	Local $t1,$t2,$t3
-	Local $pconn	= __MakeWstrPtr($sMongoconnection,	$t1)
-	Local $pdb		= __MakeWstrPtr($sMongoDatabaseName,$t2)
-	Local $pcol		= __MakeWstrPtr($sMongoCollectionName,$t3)
-	Local $tErr  	= __MakeErrStruct()
+	Local $pconn	= __Mongo_MakeWstrPtr($sMongoconnection,	$t1)
+	Local $pdb		= __Mongo_MakeWstrPtr($sMongoDatabaseName,$t2)
+	Local $pcol		= __Mongo_MakeWstrPtr($sMongoCollectionName,$t3)
+	Local $tErr  	= __Mongo_MakeErrStruct()
 	Local $pErr 	= DllStructGetPtr($tErr)
 
 	Local $aResult 	= DllCall($__hMongo_1_29_1, "ptr", "CreateCollection", "ptr", $pconn,"ptr", $pdb,"ptr", $pcol, "ptr", $pErr)
@@ -189,9 +113,9 @@ Func CreateCollection($sMongoconnection, $sMongoDatabaseName, $sMongoCollectionN
 EndFunc
 
 ; #FUNCTION# ====================================================================================================================
-; Name...........: InsertOne
+; Name...........: _Mongo_InsertOne
 ; Description ...: Insert a single json document into collection
-; Syntax.........: InsertOne($pMongocollection, $sJson)
+; Syntax.........: _Mongo_InsertOne($pMongocollection, $sJson)
 ; Parameters ....: $pMongocollection   		- from CreateCollection
 ;                  $sJson        			- valid JSON str, the document to be inserted
 ; Return values .: Mongodb Error Code, 0 if success
@@ -201,10 +125,10 @@ EndFunc
 ; Link ..........:
 ; Example .......: Yes
 ; ===============================================================================================================================
-Func InsertOne($pMongocollection, Const ByRef $sJson)
+Func _Mongo_InsertOne($pMongocollection, Const ByRef $sJson)
 	Local $t1
-	Local $pJson 	= __MakeWstrPtr($sJson,$t1)
-	Local $tErr  	= __MakeErrStruct()
+	Local $pJson 	= __Mongo_MakeWstrPtr($sJson,$t1)
+	Local $tErr  	= __Mongo_MakeErrStruct()
 	Local $pErr 	= DllStructGetPtr($tErr)
 
 	Local $aResult 	= DllCall($__hMongo_1_29_1, "int:cdecl", "InsertOne", "ptr", $pMongocollection, "ptr",$pJson, "ptr", $pErr)
@@ -212,9 +136,9 @@ Func InsertOne($pMongocollection, Const ByRef $sJson)
 EndFunc
 
 ; #FUNCTION# ====================================================================================================================
-; Name...........: InsertMany
+; Name...........: _Mongo_InsertMany
 ; Description ...: Inserts Array of documents
-; Syntax.........: InsertMany($pMongocollection, $sJson)
+; Syntax.........: _Mongo_InsertMany($pMongocollection, $sJson)
 ; Parameters ....: $pMongocollection   		- from CreateCollection
 ;                  $sJson        			- valid JSON str, starting with "[" it is an array of documents.
 ; Return values .: Boolean, false if failed
@@ -224,10 +148,10 @@ EndFunc
 ; Link ..........:
 ; Example .......: Yes
 ; ===============================================================================================================================
-Func InsertMany($pMongocollection, Const ByRef $sJson)
+Func _Mongo_InsertMany($pMongocollection, Const ByRef $sJson)
 	Local $t1
-	Local $pJson 	= __MakeWstrPtr($sJson,$t1)
-	Local $tErr  	= __MakeErrStruct()
+	Local $pJson 	= __Mongo_MakeWstrPtr($sJson,$t1)
+	Local $tErr  	= __Mongo_MakeErrStruct()
 	Local $pErr 	= DllStructGetPtr($tErr)
 
 	Local $aResult 	= DllCall($__hMongo_1_29_1, "BOOLEAN", "InsertMany", "ptr", $pMongocollection, "ptr",$pJson, "ptr", $pErr)
@@ -235,9 +159,9 @@ Func InsertMany($pMongocollection, Const ByRef $sJson)
 EndFunc
 
 ; #FUNCTION# ====================================================================================================================
-; Name...........: UpdateOne
+; Name...........: _Mongo_UpdateOne
 ; Description ...: Update a single Document in collection
-; Syntax.........: UpdateOne($pMongocollection, $search, $update, $options)
+; Syntax.........: _Mongo_UpdateOne($pMongocollection, $search, $update, $options)
 ; Parameters ....: $pMongocollection	   	- from CreateCollection
 ;                  $s_search				- valid JSON str, mongodb query, used to select the document to be updated
 ;                  $s_update				- valid JSON str, full document or only parts you want to insert/update
@@ -249,24 +173,24 @@ EndFunc
 ; Link ..........: https://www.mongodb.com/docs/manual/reference/method/db.collection.updateOne/
 ; Example .......: Yes
 ; ===============================================================================================================================
-Func UpdateOne($pMongocollection, $sQuery, $sUpdate, $sOptions)
+Func _Mongo_UpdateOne($pMongocollection, $sQuery, $sUpdate, $sOptions)
 	;~ https://www.mongodb.com/docs/manual/reference/method/db.collection.updateOne/
 	;~ commonly used options: {"upsert":true}
 	;~ returns json str like { "modifiedCount" : 1, "matchedCount" : 1, "upsertedCount" : 0 }
 	Local $t1,$t2,$t3;
-	Local $pSearch 		= __MakeWstrPtr($sQuery, 	$t1)
-	Local $pUpdate 		= __MakeWstrPtr($sUpdate, 	$t2)
-	Local $pOpt 		= __MakeWstrPtr($sOptions,	$t3)
-	Local $tErr  		= __MakeErrStruct()
+	Local $pSearch 		= __Mongo_MakeWstrPtr($sQuery, 	$t1)
+	Local $pUpdate 		= __Mongo_MakeWstrPtr($sUpdate, 	$t2)
+	Local $pOpt 		= __Mongo_MakeWstrPtr($sOptions,	$t3)
+	Local $tErr  		= __Mongo_MakeErrStruct()
 	Local $pErr 		= DllStructGetPtr($tErr)
 	Local $aResult 		= DllCall($__hMongo_1_29_1, "WSTR", "UpdateOne", "ptr", $pMongocollection, "ptr", $pSearch, "ptr", $pUpdate, "ptr", $pOpt, "ptr", $pErr)
 	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : $aResult[0]
 EndFunc
 
 ; #FUNCTION# ====================================================================================================================
-; Name...........: FindOne
+; Name...........: _Mongo_FindOne
 ; Description ...: Find a single document
-; Syntax.........: FindOne($pMongocollection, $search, $update, $options)
+; Syntax.........: _Mongo_FindOne($pMongocollection, $search, $update, $options)
 ; Parameters ....: $pMongocollection	   	- from CreateCollection
 ;                  $sQuery					- valid JSON str, mongodb query
 ;                  $sProjection				- valid JSON str, which fields to return
@@ -277,20 +201,20 @@ EndFunc
 ; Link ..........: https://www.mongodb.com/docs/manual/reference/method/db.collection.findOne/
 ; Example .......: Yes
 ; ===============================================================================================================================
-Func FindOne($pMongocollection, $sQuery, $sProjection = "{}")
+Func _Mongo_FindOne($pMongocollection, $sQuery, $sProjection = "{}")
 	Local $t1,$t2
-	Local $pQuery 		= __MakeWstrPtr($sQuery,$t1)
-	Local $pProjection	= __MakeWstrPtr($sProjection,$t2)
-	Local $tErr  		= __MakeErrStruct()
+	Local $pQuery 		= __Mongo_MakeWstrPtr($sQuery,$t1)
+	Local $pProjection	= __Mongo_MakeWstrPtr($sProjection,$t2)
+	Local $tErr  		= __Mongo_MakeErrStruct()
 	Local $pErr 		= DllStructGetPtr($tErr)
 	Local $aResult 		= DllCall($__hMongo_1_29_1, "WSTR", "FindOne", "ptr", $pMongocollection, "ptr", $pQuery, "ptr", $pProjection, "ptr", $pErr ) ;the C side prints Hello to ConsoleRead
 	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : $aResult[0]
 EndFunc
 
 ; #FUNCTION# ====================================================================================================================
-; Name...........: FindMany
+; Name...........: _Mongo_FindMany
 ; Description ...: Find multiple documents
-; Syntax.........: FindMany($pMongocollection, $sQuery, $sOpts)
+; Syntax.........: _Mongo_FindMany($pMongocollection, $sQuery, $sOpts)
 ; Parameters ....: $pMongocollection	   	- from CreateCollection
 ;                  $sQuery					- valid JSON str, mongodb query
 ;                  $sOpts					- optional, valid JSON str, see docs (example sort, skip)
@@ -302,20 +226,20 @@ EndFunc
 ; Link ..........: https://www.mongodb.com/docs/manual/reference/method/db.collection.find/
 ; Example .......: Yes
 ; ===============================================================================================================================
-Func FindMany($pMongocollection, $sQuery, $sOpts = "{}")
+Func _Mongo_FindMany($pMongocollection, $sQuery, $sOpts = "{}")
 	Local $t1,$t2
-	Local $pQuery	 	= __MakeWstrPtr($sQuery,$t1)
-	Local $pOpts 		= __MakeWstrPtr($sOpts,$t2)
-	Local $tErr  		= __MakeErrStruct()
+	Local $pQuery	 	= __Mongo_MakeWstrPtr($sQuery,$t1)
+	Local $pOpts 		= __Mongo_MakeWstrPtr($sOpts,$t2)
+	Local $tErr  		= __Mongo_MakeErrStruct()
 	Local $pErr 		= DllStructGetPtr($tErr)
 	Local $aResult 		= DllCall($__hMongo_1_29_1, "ptr", "FindMany", "ptr", $pMongocollection, "ptr", $pQuery, "ptr", $pOpts, "ptr", $pErr);
 	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : $aResult[0]
 EndFunc
 
 ; #FUNCTION# ====================================================================================================================
-; Name...........: DeleteOne
+; Name...........: _Mongo_DeleteOne
 ; Description ...: Find a single document
-; Syntax.........: DeleteOne($pMongocollection, $search, $update, $options)
+; Syntax.........: _Mongo_DeleteOne($pMongocollection, $search, $update, $options)
 ; Parameters ....: $pMongocollection	   	- from CreateCollection
 ;                  $sQuery					- valid JSON str, mongodb query
 ;                  $sProjection				- valid JSON str, which fields to return
@@ -326,18 +250,18 @@ EndFunc
 ; Link ..........: https://www.mongodb.com/docs/manual/reference/method/db.collection.deleteOne/
 ; Example .......: Yes
 ; ===============================================================================================================================
-Func DeleteOne($pMongocollection, $sQuery)
+Func _Mongo_DeleteOne($pMongocollection, $sQuery)
 	;~returns 1 if 1 document was deleted, otherwise 0
 	Local $t1;
-	Local $pQuery 		= __MakeWstrPtr($sQuery,$t1)
-	Local $tErr  		= __MakeErrStruct()
+	Local $pQuery 		= __Mongo_MakeWstrPtr($sQuery,$t1)
+	Local $tErr  		= __Mongo_MakeErrStruct()
 	Local $pErr 		= DllStructGetPtr($tErr)
 	Local $aResult 		= DllCall($__hMongo_1_29_1, "int", "DeleteOne", "ptr", $pMongocollection, "ptr", $pQuery, "ptr", $pErr)
 	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : $aResult[0]
 EndFunc
 
 ; #FUNCTION# ====================================================================================================================
-; Name...........: CursorNext
+; Name...........: _Mongo_CursorNext
 ; Description ...: Used to retrieve the next document of the Cursor (mongoc_cursor_t)
 ; Syntax.........: CursorNext($pCursor, $sQuery, $sNext)
 ; Parameters ....: $pCursor	   	- from a function that returns a cursor
@@ -347,14 +271,14 @@ EndFunc
 ; Modified.......:
 ; Remarks .......: Use CursorDestory when you are done to free the memory
 ;				   Note that the function returns bool to be used in While. The document content is put to $sNext
-; Related .......: CursorNext
+; Related .......: _Mongo_CursorNext, _Mongo_CursorDestroy, _Mongo_FindMany
 ; Link ..........:
 ; Example .......: Yes
 ; ===============================================================================================================================
-Func CursorNext($pCursor, ByRef $sNext)
+Func _Mongo_CursorNext($pCursor, ByRef $sNext)
 	Local $tResult = ""		; pass a pointer to pointer to allow the dll to return a pointer to the memory of the json string
 	Local $pResult = DllStructGetPtr($tResult)
-	Local $tErr  		= __MakeErrStruct()
+	Local $tErr  		= __Mongo_MakeErrStruct()
 	Local $pErr 		= DllStructGetPtr($tErr)
 	Local $aResult 		= DllCall($__hMongo_1_29_1, "BOOLEAN", "CursorNext", "ptr", $pCursor, "ptr*", $pResult, "ptr", $pErr)
 	If ($tErr.code <> 0) Then
@@ -373,26 +297,26 @@ Func CursorNext($pCursor, ByRef $sNext)
 EndFunc
 
 ; #FUNCTION# ====================================================================================================================
-; Name...........: CursorDestroy
+; Name...........: _Mongo_CursorDestroy
 ; Description ...: MANDATORY for any Cursor. Used to free the memory of a Cursor (mongoc_cursor_t)
-; Syntax.........: CursorDestroy($pCursor, $sQuery, $next_doc)
+; Syntax.........: _Mongo_CursorDestroy($pCursor, $sQuery, $next_doc)
 ; Parameters ....: $pCursor	   	- from CreateCollection
 ; Return values .: None
 ; Author ........: emcodem
 ; Modified.......:
 ; Remarks .......: Call this when you finished iterating your cursor.
-; Related .......: CursorDestroy
-; Link ..........:
+; Related .......:
+; Link ..........: _Mongo_CursorNext, _Mongo_CursorDestroy, _Mongo_FindMany
 ; Example .......: Yes
 ; ===============================================================================================================================
-Func CursorDestroy($ptr_cursor)
+Func _Mongo_CursorDestroy($ptr_cursor)
 	DllCall($__hMongo_1_29_1, "ptr", "CursorDestroy", "ptr", $ptr_cursor)
 EndFunc
 
 ; #FUNCTION# ====================================================================================================================
-; Name...........: ClientCommandSimple
+; Name...........: _Mongo_ClientCommandSimple
 ; Description ...: mongoc_client_command_simple
-; Syntax.........: ClientCommandSimple($pMongocollection, $sCmd)
+; Syntax.........: _Mongo_ClientCommandSimple($pMongocollection, $sCmd)
 ; Parameters ....: $pMongocollection   	- from CreateCollection
 ;                  $sCmd				- valid JSON str, mongodb query, used to select the document to be updated
 ; Return values .: JSON String
@@ -405,11 +329,11 @@ EndFunc
 ;				   https://www.mongodb.com/docs/manual/reference/command/
 ; Example .......: Yes
 ; ===============================================================================================================================
-Func ClientCommandSimple($pMongocollection, ByRef $sCmd)
+Func _Mongo_ClientCommandSimple($pMongocollection, ByRef $sCmd)
 	;https://www.mongodb.com/docs/manual/reference/command/
 	Local $t1
-	Local $pCmd 	= __MakeWstrPtr($sCmd,$t1)
-	Local $tErr  	= __MakeErrStruct()
+	Local $pCmd 	= __Mongo_MakeWstrPtr($sCmd,$t1)
+	Local $tErr  	= __Mongo_MakeErrStruct()
 	Local $pErr 	= DllStructGetPtr($tErr)
 
 	Local $aResult 	= DllCall($__hMongo_1_29_1, "WSTR", "ClientCommandSimple", "ptr", $pMongocollection, "ptr", $pCmd, "ptr", $pErr);
@@ -420,9 +344,9 @@ EndFunc
 
 #Region mongodb.au3 - Functions - MISC
 ; #INTERNAL_USE_ONLY# ===========================================================================================================
-; Name...........: __MakeWstrPtr
+; Name...........: __Mongo_MakeWstrPtr
 ; Description ...: string to wchar_t pointer (keeps utf-16 encoding)
-; Syntax.........: __MakeWstrPtr($sStr,$t1)
+; Syntax.........: __Mongo_MakeWstrPtr($sStr,$t1)
 ; Parameters ....: $sStr   	- User defined string
 ;                  $tStruct		- Empty variable, see Remarks
 ; Return values .: Pointer to $sStr for use in DllCall
@@ -431,21 +355,21 @@ EndFunc
 ; Link ..........: https://www.autoitscript.com/forum/topic/212582-problems-when-returning-dllstructgetptr-from-function/
 ; Example .......: No
 ; ===============================================================================================================================
-Func __MakeWstrPtr($sStr, ByRef $tStruct)
+Func __Mongo_MakeWstrPtr($sStr, ByRef $tStruct)
     $tStruct 	= DllStructCreate("wchar [" & StringLen($sStr) + 1 & "]") ; +1 for null terminator
 	DllStructSetData($tStruct, 1, $sStr)
     return DllStructGetPtr($tStruct)
 EndFunc
 
 ; #INTERNAL_USE_ONLY# ===========================================================================================================
-; Name...........: __MakeErrStruct
+; Name...........: __Mongo_MakeErrStruct
 ; Description ...: initialize error struct
-; Syntax.........: __MakeErrStruct($sStr,$t1)
+; Syntax.........: __Mongo_MakeErrStruct($sStr,$t1)
 ; Return values .: Error Struct to be used in CallDll
 ; Author ........: emcodem
 ; Example .......: No
 ; ===============================================================================================================================
-Func __MakeErrStruct()
+Func __Mongo_MakeErrStruct()
 	Local $tErrStruct = DllStructCreate("struct;int code;wchar message[1024];endstruct")
 	DllStructSetData($tErrStruct, "code", 0)
 	DllStructSetData($tErrStruct, "message", "")

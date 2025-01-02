@@ -5,7 +5,7 @@
 #include <stdexcept>
 #include <Windows.h>
 #include <bson.h>
-#include <mongoc/mongoc.h>
+
 
 namespace utils {
 
@@ -36,7 +36,7 @@ namespace utils {
     // Validates whether the given wchar_t* is a valid null-terminated wide string.
     int is_valid_wstring(wchar_t* str);
 
-    const char* getLogLevelStr(mongoc_log_level_t log_level);
+    
 
 } // namespace utils
 
