@@ -3,7 +3,9 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/main/VisualStudio.gitignore
 
-./MongoCBridge
+./MongoCBridge/
+*.idb
+*FileListAbsolute.txt
 
 # User-specific files
 *.rsuser
