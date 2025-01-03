@@ -77,8 +77,8 @@ extern "C"
         return impl::_FindMany(c, utf16_query_json, utf_16_options, err);
     }
 
-    DECLDIR bool CursorNext(mongoc_cursor_t* cursor, wchar_t*& result, struct ErrorStruct* err) {
-        return impl::_CursorNext(cursor, result, err);
+    DECLDIR bool CursorNext(mongoc_cursor_t* cursor, wchar_t*& result, UINT64* resultlen, struct ErrorStruct* err) {
+        return impl::_CursorNext(cursor, result, resultlen, err);
     }
 
     DECLDIR wchar_t* ClientCommandSimple(mongoc_collection_t* c, wchar_t* utf_16_command, struct ErrorStruct* err){
@@ -375,14 +375,16 @@ namespace impl {
         return results;
     }
 
-    bool _CursorNext(mongoc_cursor_t* cursor, wchar_t*& result, struct ErrorStruct* err)
+    bool _CursorNext(mongoc_cursor_t* cursor, wchar_t*& result, UINT64* resultlen, struct ErrorStruct* err)
     {
         const bson_t* doc;
         bson_error_t error;
+        
         if (mongoc_cursor_next(cursor, &doc)) {
             char* charptr = bson_as_canonical_extended_json(doc, NULL);
             std::string str(charptr);
             result = utils::string_to_wide_string(str);
+            *resultlen = wcslen(result);
             bson_free(charptr);
             return true;
         }

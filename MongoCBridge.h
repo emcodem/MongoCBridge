@@ -23,7 +23,7 @@ extern "C"
     DECLDIR mongoc_cursor_t* FindMany(mongoc_collection_t* c, wchar_t* utf16_query_json, wchar_t* utf_16_options, struct ErrorStruct* err);
     DECLDIR wchar_t*    UpdateOne(mongoc_collection_t* c, wchar_t* utf16_search, wchar_t* utf16_update, wchar_t* utf16_options, struct ErrorStruct* err);
     DECLDIR int         DeleteOne(mongoc_collection_t* c, wchar_t* utf16_search, struct ErrorStruct* err);
-    DECLDIR bool        CursorNext(mongoc_cursor_t* cursor, wchar_t*& result, struct ErrorStruct* err);
+    DECLDIR bool        CursorNext(mongoc_cursor_t* cursor, wchar_t*& result, UINT64* resultlen, struct ErrorStruct* err);
     DECLDIR wchar_t*    ClientCommandSimple(mongoc_collection_t* c, wchar_t* utf_16_command, struct ErrorStruct* err);
 
     // InsertMany
@@ -79,7 +79,7 @@ namespace impl {
     wchar_t*    _UpdateOne(mongoc_collection_t* c, wchar_t* query, wchar_t* payload, wchar_t* utf16_options, struct ErrorStruct* err);
     int         _DeleteOne(mongoc_collection_t* c, wchar_t* query, struct ErrorStruct* err);
     mongoc_cursor_t* _FindMany(mongoc_collection_t* c, wchar_t* utf16_query_json, wchar_t* utf_16_options, struct ErrorStruct* err);
-    bool        _CursorNext(mongoc_cursor_t* cursor, wchar_t*& result, struct ErrorStruct* err);
+    bool        _CursorNext(mongoc_cursor_t* cursor, wchar_t*& result, UINT64* resultlen, struct ErrorStruct* err);
     
     wchar_t*    _ClientCommandSimple(mongoc_collection_t* c, wchar_t* utf_16_command, struct ErrorStruct* err);
     

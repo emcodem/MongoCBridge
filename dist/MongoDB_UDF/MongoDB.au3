@@ -1,7 +1,6 @@
 #AutoIt3Wrapper_UseX64=Y
 Opt("MustDeclareVars", 1)
 #include-once
-#include <WinAPIMisc.au3>
 #include <WinAPISys.au3>
 
 ;#AutoIt3Wrapper_Au3Check_Parameters=-d -w 1 -w 2 -w 3 -w- 4 -w 5 -w 6 -w- 7
@@ -60,7 +59,7 @@ EndFunc
 ; Return values .: No return values, use _WinAPI_GetLastError() to check for errors
 ; Author ........: emcodem (emcodem@ffastrans.com)
 ; Modified.......:
-; Remarks .......:  Includes only logs of this driver, not mongodb logs.
+; Remarks .......:  Includes only logs from this driver, not mongodb logs.
 ;					All Hosts and Collections you open with the same $__hMongo_1_29_1 handle will go to this log.
 ;					Disables STDERR output of the log lines.
 ;				   	Each Log is done in a mutex automatically by the mongoc api, it should be thread safe.
@@ -276,23 +275,23 @@ EndFunc
 ; Example .......: Yes
 ; ===============================================================================================================================
 Func _Mongo_CursorNext($pCursor, ByRef $sNext)
-	Local $tResult = ""		; pass a pointer to pointer to allow the dll to return a pointer to the memory of the json string
-	Local $pResult = DllStructGetPtr($tResult)
+
 	Local $tErr  		= __Mongo_MakeErrStruct()
 	Local $pErr 		= DllStructGetPtr($tErr)
-	Local $aResult 		= DllCall($__hMongo_1_29_1, "BOOLEAN", "CursorNext", "ptr", $pCursor, "ptr*", $pResult, "ptr", $pErr)
+	Local $pResult   	= DllStructGetPtr("")
+	Local $pResultlen   = DllStructGetPtr(0)
+
+	Local $aResult 		= DllCall($__hMongo_1_29_1, "BOOLEAN", "CursorNext", "ptr", $pCursor, "ptr*", $pResult, "UINT64*",$pResultlen, "ptr", $pErr)
 	If ($tErr.code <> 0) Then
 		return SetError($tErr.code, $tErr.code, $tErr.message)
 	EndIf
 	If Not($aResult[0]) Then ;nothing to return
 		return $aResult[0]
 	EndIf
-	;idk why $_resultptr is not working, but aResult[2] contains a ptr to our data.
-	;https://www.autoitscript.com/forum/topic/196910-get-string-from-pointer-to-memory-solved/
-	;we use _WinAPI_StringLenW to determine the length of the pointed string and copy the stuff into autoit variable
-	$sNext = DllStructGetData(DllStructCreate("wchar[" & _WinAPI_StringLenW($aResult[2]) & "]", $aResult[2]), 1)
-	;todo: do we need to explicitly free this memory?
 
+	;shame on me that i did not find a better way to return the $aResult from the dll
+	;could have just returned wchar_t* like in findOne but i wanted the bool as returnval from C side
+	$sNext = DllStructGetData(DllStructCreate("wchar[" & $aResult[3] & "]", $aResult[2]), 1)
 	return $aResult[0] ; bool
 EndFunc
 

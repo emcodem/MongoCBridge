@@ -6,6 +6,8 @@
  Script Function:
 	Tests and Examples for MongoDB.au3
 
+ Remarks: This must be #included BEFORE the MongoDB.au3,
+		  otherwise the string constants '{}' do not work as ByRef Parameter
 #ce ----------------------------------------------------------------------------
 
 
