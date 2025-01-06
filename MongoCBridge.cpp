@@ -4,14 +4,16 @@
 #include <time.h>
 #include <string>
 #include <cwchar> // For wide character functions
-
+#include "BSonParser.h"
 #include "MongoCBridge.h"
+#include "BsonBridge.h"
 
 using namespace std;
 
 extern "C"
 {
     /* DLL Exports */
+
     DECLDIR wchar_t* Echo(wchar_t* utf16String)
     {
         if (utf16String == nullptr) {
@@ -58,9 +60,9 @@ extern "C"
         return impl::_InsertMany(c, utf16ArrayOfJsons, err);
     }
 
-    DECLDIR wchar_t* FindOne(mongoc_collection_t* c, wchar_t* query, wchar_t* utf_16_options, struct ErrorStruct* err)
+    DECLDIR wchar_t* FindOne(mongoc_collection_t* c, wchar_t* query, wchar_t* utf_16_options, wchar_t* top_level_field, struct ErrorStruct* err)
     {
-        return impl::_FindOne(c, query, utf_16_options, err);
+        return impl::_FindOne(c, query, utf_16_options, top_level_field, err);
     }
 
     DECLDIR wchar_t* UpdateOne(mongoc_collection_t* c, wchar_t* utf16_search, wchar_t* utf16_update, wchar_t* utf16_options, struct ErrorStruct* err)
@@ -77,17 +79,123 @@ extern "C"
         return impl::_FindMany(c, utf16_query_json, utf_16_options, err);
     }
 
+    DECLDIR mongoc_cursor_t* Collection_Aggregate(mongoc_collection_t* c, wchar_t* pipeline, wchar_t* opts, struct ErrorStruct* err) {
+        return impl::_Collection_Aggregate(c, pipeline, opts, err);
+    }
+    
+
     DECLDIR bool CursorNext(mongoc_cursor_t* cursor, wchar_t*& result, UINT64* resultlen, struct ErrorStruct* err) {
         return impl::_CursorNext(cursor, result, resultlen, err);
     }
 
-    DECLDIR wchar_t* ClientCommandSimple(mongoc_collection_t* c, wchar_t* utf_16_command, struct ErrorStruct* err){
-        return impl::_ClientCommandSimple (c, utf_16_command, err);
+    DECLDIR wchar_t* ClientCommandSimple(mongoc_collection_t* c, wchar_t* utf_16_command, wchar_t* database, struct ErrorStruct* err){
+        return impl::_ClientCommandSimple (c, utf_16_command, database, err);
+    }
+    
+    // Function to append a BSON subdocument to a specific path in a JSON document
+    DECLDIR wchar_t* JsonAppendSubJson(wchar_t* json, wchar_t* key, wchar_t* subDoc, wchar_t* selector, struct ErrorStruct* err) {
+        bson_error_t error;
+
+        // Convert wchar_t to std::string
+        std::string _json = utils::wide_string_to_string(json);
+        std::string _key = utils::wide_string_to_string(key);
+        std::string _selector = utils::wide_string_to_string(selector);
+        std::string _subDoc = utils::wide_string_to_string(subDoc);
+        bson_t* original_bson = bson_new_from_json((const uint8_t*)_json.c_str(), _json.size(), &error);
+        bson_t* to_append = bson_new_from_json((const uint8_t*)_subDoc.c_str(), _subDoc.size(), &error);
+        bsonparser::insert_bson_at_selector(original_bson, _selector.c_str(), _key.c_str(), to_append);
+
+        // Convert the updated BSON document back to JSON
+        char* json_out = bson_as_canonical_extended_json(original_bson, NULL);
+        std::string sjout(json_out);
+        wchar_t* result = utils::string_to_wide_string(sjout);  // Convert the JSON back to wchar_t*
+
+        // Clean up
+        bson_free(json_out);
+        bson_destroy(to_append);
+        bson_destroy(original_bson);
+
+        return result;
     }
 
+    // Function to append a BSON subdocument to a new key in a parent document at a specific path
+    DECLDIR wchar_t* JsonAppendValue(wchar_t* json, wchar_t* key, wchar_t* value, wchar_t* selector, struct ErrorStruct* err) {
+        bson_t* original_bson = NULL;
+        bson_t* to_append = NULL;
+        bson_error_t error;
+        bson_iter_t iter;
 
+        // Convert wide strings to standard strings
+        std::string _json = utils::wide_string_to_string(json);
+        std::string _key = utils::wide_string_to_string(key);
+        std::string _value = utils::wide_string_to_string(value);
+        std::string _selector = utils::wide_string_to_string(selector);
+
+        // Parse the input JSON into a BSON object
+        original_bson = bson_new_from_json((const uint8_t*)_json.c_str(), _json.size(), &error);
+        if (!original_bson) {
+            // If parsing fails, return the original JSON
+            return json;
+        }
+
+        // Create a new BSON object to hold the key-value pair to append
+        to_append = bson_new();
+        if (!to_append) {
+            bson_destroy(original_bson);
+            return json;
+        }
+        bson_append_utf8(to_append, _key.c_str(), -1, _value.c_str(), -1);
+
+        // Locate the position specified by the selector
+        if (bson_iter_init(&iter, original_bson) && bson_iter_find_descendant(&iter, _selector.c_str(), &iter)) {
+            // If the path exists, append the key-value pair at the found location
+            const char* key = bson_iter_key(&iter);
+            bson_append_iter(original_bson, key, -1, &iter);
+            bson_append_document(original_bson, _key.c_str(), -1, to_append);
+        }
+        else {
+            // If the selector path doesn't exist, append the key-value pair at the top level
+            bson_append_document(original_bson, _key.c_str(), -1, to_append);
+        }
+
+        // Convert the modified BSON back to a JSON string
+        char* charptr = bson_as_canonical_extended_json(original_bson, NULL);
+        std::string str(charptr);
+        wchar_t* result = utils::string_to_wide_string(str);
+
+        // Cleanup
+        bson_free(charptr);
+        bson_destroy(original_bson);
+        bson_destroy(to_append);
+
+        return result;
+    }
+
+    DECLDIR wchar_t* GetJsonValue(wchar_t* json, wchar_t* selector, wchar_t* defaultVal, struct ErrorStruct* err) {
+        //todo: error handling?!
+        bson_error_t error;
+        bson_t* b;
+
+        std::string _json = utils::wide_string_to_string(json);
+        b = bson_new_from_json((const uint8_t*)_json.c_str(), _json.size(), &error);
+        std::string _selector = utils::wide_string_to_string(selector);
+
+        const bson_value_t* found_value = NULL;
+        const bson_t* result = NULL;
+        bson_iter_t iter;
+
+        if (bson_iter_init(&iter, b)) {
+            if (bson_iter_find_descendant(&iter, _selector.c_str(), &iter)) {
+                const bson_value_t* bv = bson_iter_value(&iter);
+                bson_type_t t = bv->value_type;
+                wchar_t* out = bsonparser::convert_bson_iter_value(&iter);
+                return out;
+            }
+        }
+
+        return defaultVal;
+    }
 }
-
 
 namespace impl {
 
@@ -261,21 +369,38 @@ namespace impl {
     }
 
 
-    wchar_t* _FindOne(mongoc_collection_t* c, wchar_t* utf16_query_json, wchar_t* utf_16_options, struct ErrorStruct* err)
+    wchar_t* _FindOne(mongoc_collection_t* c, wchar_t* utf16_query_json, wchar_t* utf_16_options, wchar_t* top_level_field, struct ErrorStruct* err)
     {
         bson_t* filter;
-        const bson_t* doc;
+        bson_t* doc;
         bson_error_t error;
         if (!utils::is_valid_wstring(utf_16_options)) {
             utf_16_options = (wchar_t*)L"{}";
         }
         bson_t* opts = utils::wchar_to_bson_t(utf_16_options);
+        if (!utils::is_valid_wstring(top_level_field)) {
+            top_level_field = (wchar_t*)L"";
+        }
+        std::string s_toplevelfield = utils::wide_string_to_string(top_level_field);
 
         std::string utf8_query = utils::wide_string_to_string(utf16_query_json);
         filter = bson_new_from_json((const uint8_t*)utf8_query.c_str(), utf8_query.size(), &error);
         mongoc_cursor_t* cursor = mongoc_collection_find_with_opts(c, filter, opts, NULL);
         
-        while (mongoc_cursor_next(cursor, &doc)) {
+        while (mongoc_cursor_next(cursor, (const bson_t**)&doc)) {
+
+            //if we have a top level field filter, attempt to parse it from bso
+            if (strcmp(s_toplevelfield.c_str(), "") != 0) {
+                bson_iter_t iter;
+                if (bson_iter_init(&iter, doc)) {
+                    if (bson_iter_find(&iter, s_toplevelfield.c_str())) {
+                        wchar_t* to_return = bsonparser::convert_bson_iter_value(&iter);
+                        bson_destroy(doc);
+                        return to_return;
+                    }
+                }
+            }
+            //else we just return what we got
             char* charptr = bson_as_canonical_extended_json(doc, NULL);
             std::string str(charptr);
             wchar_t * result = utils::string_to_wide_string(str);
@@ -290,9 +415,10 @@ namespace impl {
             return 0;
         }
         //if no result found, return empty result
-        MONGOC_ERROR("FindOne mongoc_collection_find_with_opts graceful but got no results for query.\n");
+        utils::charErrtoStruct(47, "NoMatchingDocument", err);
         mongoc_cursor_destroy(cursor);
         bson_destroy(filter);
+        bson_destroy(doc);
         return 0;
     }
 
@@ -375,6 +501,31 @@ namespace impl {
         return results;
     }
 
+    mongoc_cursor_t* _Collection_Aggregate(mongoc_collection_t* c, wchar_t* pipeline, wchar_t* opts, struct ErrorStruct* err)
+    {
+        /* returns cursor, caller needs to destroy it */
+
+        if (!utils::is_valid_wstring(pipeline)) {
+            pipeline = (wchar_t*)L"{}";
+        }
+        if (!utils::is_valid_wstring(opts)) {
+            pipeline = (wchar_t*)L"{ cursor: { batchSize: 1 }";
+        }
+
+        bson_t* bson_opts       = utils::wchar_to_bson_t(opts);
+        bson_t* bson_pipeline   = utils::wchar_to_bson_t(pipeline);
+
+        mongoc_cursor_t* results = mongoc_collection_aggregate(c,
+            MONGOC_QUERY_NONE,
+            bson_pipeline,
+            bson_opts,
+            NULL);
+
+        bson_destroy(bson_opts);
+        bson_destroy(bson_pipeline);
+        return results;
+    }
+
     bool _CursorNext(mongoc_cursor_t* cursor, wchar_t*& result, UINT64* resultlen, struct ErrorStruct* err)
     {
         const bson_t* doc;
@@ -396,19 +547,23 @@ namespace impl {
         return false;
     }
 
-    wchar_t* _ClientCommandSimple(mongoc_collection_t* c, wchar_t* utf_16_command, struct ErrorStruct* err) {
+    wchar_t* _ClientCommandSimple(mongoc_collection_t* c, wchar_t* utf_16_command, wchar_t* database, struct ErrorStruct* err) {
         //https://www.mongodb.com/docs/manual/reference/command/
         if (!utils::is_valid_wstring(utf_16_command)) {
             MONGOC_ERROR("Invalid parameter \"command\"\n");
             return NULL;
         }
+        
         bson_t* command = utils::wchar_to_bson_t(utf_16_command);
         bson_t* reply = bson_new();
         bson_error_t error;
-
+        std::string s_db(c->db);
+        if (database != nullptr && wcslen(database) != 0) {
+            s_db = utils::wide_string_to_string(database);
+        }
         //if the command is successful, error is not initialized so we must use if else as seen in mongo tutorials executing.c example code
         if (mongoc_client_command_simple(c->client,
-                                    c->db,
+                                    s_db.c_str(),
                                     command,
                                     NULL,//const mongoc_read_prefs_t * read_prefs,
                                     reply,
@@ -514,28 +669,31 @@ namespace impl {
         mongoc_log_trace_enable();
     }
 
+
+
 }
 
-/* winmain and main are only used when compiled as commandline exe instead of dll for testing */
-int main(int argc, char* argv[]) {
-    //when started from commandline, this is the entry point
-    // it is not possible to use wchar_t* when initializing the variable by string literal
-    const wchar_t* constr   = L"mongodb://localhost:27017"; 
-    wchar_t* modifiable_str = new wchar_t[wcslen(constr) + 1];
-    size_t prefixLength     = std::wcslen(modifiable_str);
-    //just because we should not cast const wchar_t to wchar_t
-    wcscpy_s(modifiable_str, prefixLength, constr); 
-
-    //impl::_ConnectDatabase(modifiable_str);
-    const wchar_t* prefix = L"{\"hello\":\"worldöy\"}";
-    //impl::_InsertOne((wchar_t*)prefix);
-    return 0;
-}
-
-int APIENTRY WinMain(HINSTANCE hInstance,
-    HINSTANCE hPrevInstance,
-    LPSTR lpCmdLine, int nCmdShow)
-{
-    return main(__argc, __argv);
-}
+//
+///* winmain and main are only used when compiled as commandline exe instead of dll for testing */
+//int main(int argc, char* argv[]) {
+//    //when started from commandline, this is the entry point
+//    // it is not possible to use wchar_t* when initializing the variable by string literal
+//    const wchar_t* constr   = L"mongodb://localhost:27017"; 
+//    wchar_t* modifiable_str = new wchar_t[wcslen(constr) + 1];
+//    size_t prefixLength     = std::wcslen(modifiable_str);
+//    //just because we should not cast const wchar_t to wchar_t
+//    wcscpy_s(modifiable_str, prefixLength, constr); 
+//
+//    //impl::_ConnectDatabase(modifiable_str);
+//    const wchar_t* prefix = L"{\"hello\":\"worldöy\"}";
+//    //impl::_InsertOne((wchar_t*)prefix);
+//    return 0;
+//}
+//
+//int APIENTRY WinMain(HINSTANCE hInstance,
+//    HINSTANCE hPrevInstance,
+//    LPSTR lpCmdLine, int nCmdShow)
+//{
+//    return main(__argc, __argv);
+//}
 

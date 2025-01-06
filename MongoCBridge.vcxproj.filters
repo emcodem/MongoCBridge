@@ -5,6 +5,10 @@
     <ClCompile Include="MongoCBridge.cpp" />
     <ClCompile Include="pch.cpp" />
     <ClCompile Include="utils.cpp" />
+    <ClCompile Include="BsonParser.cpp" />
+    <ClCompile Include="BsonBridge.cpp">
+      <Filter>headers</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="common.h">
@@ -17,6 +21,12 @@
       <Filter>headers</Filter>
     </ClInclude>
     <ClInclude Include="pch.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="BsonParser.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="BsonBridge.h">
       <Filter>headers</Filter>
     </ClInclude>
   </ItemGroup>

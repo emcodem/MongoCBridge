@@ -10,8 +10,29 @@
 		  otherwise the string constants '{}' do not work as ByRef Parameter
 #ce ----------------------------------------------------------------------------
 
+#include "Mongodb.au3"
 
 #Region mongodb.au3 - TESTS
+Func _MongoRunJsonTests()
+	Local $makeIndexcmd = '{"createIndexes": "configs","indexes": [{"key":{ "name": 1 },"name": "MYINDEXNAME","unique": true},{"key":true}]}'
+	;retrieve Array
+	Local $ret = _Mongo_GetJsonVal($makeIndexcmd,"indexes","")
+	;iterate Array
+	Local $iDx = -1
+	Local $array_ret
+	Local $aResults[2]
+	While $array_ret <> "_EOF_"
+		$iDx += 1
+		$array_ret = _Mongo_GetJsonVal($ret,$iDx,"_EOF_")
+		;_ArrayPush($aResults, $array_ret)
+		ConsoleWrite("TEST Array Ret: " & $array_ret & @CRLF)
+	Wend
+	
+	If ($iDx <> 2) Then
+		ConsoleWrite("TEST ERROR: _Mongo_GetJsonVal: Array Error, expected 2, got "&$iDx)
+		Exit 1
+	EndIf
+EndFunc
 
 Func _MongoRunTests()
 
@@ -58,7 +79,7 @@ Func _MongoRunTests()
 		ConsoleWrite("TEST ERROR: ClientCommandSimple listIndexes: " & $sResult)
 		Exit 1
 	EndIf
-	ConsoleWrite("ClientCommandSimple listIndexes Success: " & $sResult & @CRLF)
+	ConsoleWrite("ClientCommandSimple listIndexes Success" & @CRLF)
 
 	$sResult = _Mongo_InsertOne($pMongocollection, '{"application":"ffastrans","boss":"steinar"}')
 	If (@error) Then
@@ -80,21 +101,21 @@ Func _MongoRunTests()
 		ConsoleWrite("TEST ERROR: UpdateOne: " & $sResult & @CRLF)
 		Exit 1
 	EndIf
-	ConsoleWrite("ClientCommandSimple listIndexes Success: " & $sResult & @CRLF)
+	ConsoleWrite("UpdateOne Success " & @CRLF)
 
 	$sResult = _Mongo_InsertMany($pMongocollection,'[{"application":"windows"},{"application":"macos"}]')
 	If (@error) Then
 		ConsoleWrite("TEST ERROR: InsertMany: " & $sResult & @CRLF)
 		Exit 1
 	EndIf
-	ConsoleWrite("InsertMany Success: " & $sResult & @CRLF)
+	ConsoleWrite("InsertMany Success" & @CRLF)
 
 	$sResult = _Mongo_DeleteOne($pMongocollection,'{"application":"macos"}')
 	If (@error) Then
 		ConsoleWrite("TEST ERROR: DeleteOne: " & $sResult & @CRLF)
 		Exit 1
 	EndIf
-	ConsoleWrite("DeleteOne Success: " & $sResult & @CRLF)
+	ConsoleWrite("DeleteOne Success" & @CRLF)
 
 	$sResult = _Mongo_FindMany($pMongocollection, "{}", "{}")
 	If (@error) Then
@@ -102,12 +123,11 @@ Func _MongoRunTests()
 		Exit 1
 	EndIf
 	;Iterate over cursor
-	Local $sNext
-	While (_Mongo_CursorNext($sResult,$sNext))
-		ConsoleWrite("FindMany Next: " & $sNext & @CRLF)
-	WEnd
-	;Release cursor
-	_Mongo_CursorDestroy($sResult)
+	Local $aArray = _Mongo_Cursor_To_Array($sResult)
+	If (Ubound($aArray) <> 3) Then
+		ConsoleWrite("TEST ERROR: _Mongo_Cursor_To_Array, expected: 3, got: " & Ubound ($aArray) &  @CRLF)
+		Exit 1
+	EndIf
 
 EndFunc
 

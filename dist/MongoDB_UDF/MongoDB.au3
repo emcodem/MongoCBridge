@@ -2,6 +2,7 @@
 Opt("MustDeclareVars", 1)
 #include-once
 #include <WinAPISys.au3>
+#include <Array.au3>
 
 ;#AutoIt3Wrapper_Au3Check_Parameters=-d -w 1 -w 2 -w 3 -w- 4 -w 5 -w 6 -w- 7
 
@@ -12,23 +13,33 @@ Opt("MustDeclareVars", 1)
 ; Author(s) .....: emcodem
 ; Modifiers .....:
 ; Forum link ....:
-; Description ...: An example UDF that does very little.
+; Description ...: Uses MongocBridge.dll which exposes functions of mongoc dlls for easy use from Autoit
 ; ===============================================================================================================================
 
-
+;~ _Mongo_Init($sInstallDir = @ScriptDir & "\include\MongoDB_UDF\")
+;~ _Mongo_SetLogFile($sFilepath)
+;~ _Mongo_CreateCollection($sMongoconnection, $sMongoDatabaseName, $sMongoCollectionName)
+;~ _Mongo_InsertOne($pMongocollection, Const ByRef $sJson)
+;~ _Mongo_InsertMany($pMongocollection, Const ByRef $sJson)
+;~ _Mongo_FindOne($pMongocollection, $sQuery, $sProjection = "{}")
+;~ _Mongo_UpdateOne($pMongocollection, $sQuery, $sUpdate, $sOptions = "{}")
+;~ _Mongo_DeleteOne($pMongocollection, $sQuery)
+;~ _Mongo_Coll_Aggregate($pMongocollection, $sPipeline, $sOpts = "{}")
+;~ _Mongo_FindMany($pMongocollection, $sQuery, $sOpts = "{}")
+;~ _Mongo_CursorNext($pCursor, ByRef $sNext)
+;~ _Mongo_CursorDestroy($ptr_cursor)
+;~ _Mongo_ClientCommandSimple($pMongocollection, ByRef $sCmd)
 
 
 ; #FUNCTION# ====================================================================================================================
 ; Name...........: _Mongo_Init
-; Description ...: Set Filename and Path for Mongo Driver logs
+; Description ...: Mandatory, Loads the Dlls 
 ; Syntax.........: _Mongo_Init($sInstallDir)
-; Parameters ....: $sFilepath - Full File Path, Direcotry must exist
-; Return values .: No return values, use _WinAPI_GetLastError() to check for errors
+; Parameters ....: $sFilepath - the Path where MongoDB.au3 along with dependencies Folder is.
+; Return values .: None
 ; Author ........: emcodem (emcodem@ffastrans.com)
 ; Modified.......:
-; Remarks .......:
-;
-;					MongoCbridge.dll resolves mongoc dlls in path and executeable folder
+; Remarks .......:  MongoCbridge.dll links the mongoc dlls, they must be either in the path we use _WinAPI_SetDllDirectory
 ;					We force it to search them relative to this script
 ; Related .......:
 ; Link ..........:
@@ -74,7 +85,6 @@ Func _Mongo_SetLogFile($sFilepath)
 	Local $pPath	= __Mongo_MakeWstrPtr($sFilepath,$t1)
 	Local $tErr  	= __Mongo_MakeErrStruct()
 	Local $pErr 	= DllStructGetPtr($tErr)
-	ConsoleWrite($__hMongo_1_29_1)
 	DllCall($__hMongo_1_29_1, "NONE", "SetLogFile", "ptr", $pPath)
 	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : ""
 EndFunc
@@ -172,7 +182,7 @@ EndFunc
 ; Link ..........: https://www.mongodb.com/docs/manual/reference/method/db.collection.updateOne/
 ; Example .......: Yes
 ; ===============================================================================================================================
-Func _Mongo_UpdateOne($pMongocollection, $sQuery, $sUpdate, $sOptions)
+Func _Mongo_UpdateOne($pMongocollection, $sQuery, $sUpdate, $sOptions = "{}")
 	;~ https://www.mongodb.com/docs/manual/reference/method/db.collection.updateOne/
 	;~ commonly used options: {"upsert":true}
 	;~ returns json str like { "modifiedCount" : 1, "matchedCount" : 1, "upsertedCount" : 0 }
@@ -189,24 +199,53 @@ EndFunc
 ; #FUNCTION# ====================================================================================================================
 ; Name...........: _Mongo_FindOne
 ; Description ...: Find a single document
-; Syntax.........: _Mongo_FindOne($pMongocollection, $search, $update, $options)
+; Syntax.........: _Mongo_FindOne($pMongocollection, $sQuery, $sProjection = "{}")
 ; Parameters ....: $pMongocollection	   	- from CreateCollection
 ;                  $sQuery					- valid JSON str, mongodb query
 ;                  $sProjection				- valid JSON str, which fields to return
+;				   $sTopLevelField			- str, this is not part of mongo but our own invention, forces return content of this top level field
 ; Return values .: JSON String, the document found or {}
 ; Author ........: emcodem
 ; Modified.......:
-; Remarks .......:
+; Remarks .......: Sets @Error code 47 (NoMatchingDocument) if none found
 ; Link ..........: https://www.mongodb.com/docs/manual/reference/method/db.collection.findOne/
 ; Example .......: Yes
 ; ===============================================================================================================================
-Func _Mongo_FindOne($pMongocollection, $sQuery, $sProjection = "{}")
-	Local $t1,$t2
+Func _Mongo_FindOne($pMongocollection, $sQuery, $sProjection = "{}", $sTopLevelField = "")
+	Local $t1,$t2,$t3
 	Local $pQuery 		= __Mongo_MakeWstrPtr($sQuery,$t1)
 	Local $pProjection	= __Mongo_MakeWstrPtr($sProjection,$t2)
+	Local $pTlf			= __Mongo_MakeWstrPtr($sTopLevelField,$t3)
 	Local $tErr  		= __Mongo_MakeErrStruct()
 	Local $pErr 		= DllStructGetPtr($tErr)
-	Local $aResult 		= DllCall($__hMongo_1_29_1, "WSTR", "FindOne", "ptr", $pMongocollection, "ptr", $pQuery, "ptr", $pProjection, "ptr", $pErr ) ;the C side prints Hello to ConsoleRead
+	Local $aResult 		= DllCall($__hMongo_1_29_1, "WSTR", "FindOne", "ptr", $pMongocollection, "ptr", $pQuery, "ptr", $pProjection, "ptr", $pTlf, "ptr", $pErr )
+	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : $aResult[0]
+EndFunc
+
+
+; #FUNCTION# ====================================================================================================================
+; Name...........: _Mongo_Coll_Aggregate
+; Description ...: Executes an Aggregation Pipeline
+; Syntax.........: _Mongo_Coll_Aggregate($pMongocollection, $sPipeline, $sOpts = "{}")
+; Parameters ....: $pMongocollection	   	- from CreateCollection
+;                  $sPipelinee				- valid JSON str, mongodb Aggregation Pipeline JSON
+;                  $sOpts					- optional, valid JSON str, see docs (example sort, skip)
+; Return values .: Pointer to mongoc_cursor_t
+; Author ........: emcodem
+; Modified.......:
+; Remarks .......: Use CursorNext to iterate through the documents, use CursorDestory when you are done to free the memory
+; Related .......: CursorNext, CursorDestroy
+; Link ..........: https://mongoc.org/libmongoc/current/mongoc_collection_aggregate.html
+;				   https://www.mongodb.com/docs/manual/core/aggregation-pipeline/
+; Example .......: Yes
+; ===============================================================================================================================
+Func _Mongo_Coll_Aggregate($pMongocollection, $sPipeline, $sOpts = "{}")
+	Local $t1,$t2
+	Local $pPipeline	= __Mongo_MakeWstrPtr($sPipeline,$t1)
+	Local $pOpts 		= __Mongo_MakeWstrPtr($sOpts,$t2)
+	Local $tErr  		= __Mongo_MakeErrStruct()
+	Local $pErr 		= DllStructGetPtr($tErr)
+	Local $aResult 		= DllCall($__hMongo_1_29_1, "ptr", "Collection_Aggregate", "ptr", $pMongocollection, "ptr", $pPipeline, "ptr", $pOpts, "ptr", $pErr);
 	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : $aResult[0]
 EndFunc
 
@@ -235,6 +274,71 @@ Func _Mongo_FindMany($pMongocollection, $sQuery, $sOpts = "{}")
 	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : $aResult[0]
 EndFunc
 
+
+; #FUNCTION# ====================================================================================================================
+; Name...........: _Mongo_CursorNext
+; Description ...: Used to retrieve the next document of the Cursor (mongoc_cursor_t)
+; Syntax.........: CursorNext($pCursor, $sQuery, $sNext)
+; Parameters ....: $pCursor	   	- from a function that returns a cursor
+;                  $sNext		- ByRef variable wich will be populated with the JSON string of next document
+; Return values .: Bool			- true if there there is a next document
+; Author ........: emcodem
+; Modified.......:
+; Remarks .......: Use CursorDestory when you are done to free the memory
+;				   Note that the function returns bool to be used in While. The document content is put to $sNext
+;			       Sets @error to 47 (no matching documents) if result is empty
+; Related .......: _Mongo_CursorNext, _Mongo_CursorDestroy, _Mongo_FindMany
+; Link ..........:
+; Example .......: Yes
+; ===============================================================================================================================
+Func _Mongo_CursorNext($pCursor, ByRef $sNext)
+
+	Local $tErr  		= __Mongo_MakeErrStruct()
+	Local $pErr 		= DllStructGetPtr($tErr)
+	Local $pResult   	= DllStructGetPtr("")
+	Local $pResultlen   = DllStructGetPtr(0)
+
+	Local $aResult 		= DllCall($__hMongo_1_29_1, "BOOLEAN", "CursorNext", "ptr", $pCursor, "ptr*", $pResult, "UINT64*",$pResultlen, "ptr", $pErr)
+	If ($tErr.code <> 0) Then
+		ConsoleWrite("Cursor Error " & $tErr.message)
+		SetError($tErr.code, $tErr.code, $tErr.message)
+	EndIf
+	
+	If Not($aResult[0]) Then ;nothing to write to sNext
+		return SetError(47)
+	EndIf
+
+	;shame on me that i did not find a better way to return the $aResult from the dll
+	;could have just returned wchar_t* like in findOne but i wanted the bool as returnval from C side
+	$sNext = DllStructGetData(DllStructCreate("wchar[" & $aResult[3] & "]", $aResult[2]), 1)
+	return $aResult[0] ; bool
+EndFunc
+
+; #FUNCTION# ====================================================================================================================
+; Name...........: _Mongo_Cursor_To_Array
+; Description ...: Convenience Function to retrieve all items of cursor and auto close it
+; Syntax.........: CursorNext($pCursor, $sQuery, $sNext)
+; Parameters ....: $pCursor (returned by a Function like FindMany)
+; Return values .: Array
+; Author ........: emcodem
+; Modified.......:
+; Remarks .......: Releases the Cursor _Mongo_CursorDestroy when done
+; 				   No Error handling
+; Related .......: _Mongo_CursorNext
+; Link ..........:
+; Example .......: Yes
+; ===============================================================================================================================
+Func _Mongo_Cursor_To_Array($pCursor)
+	Local $sNext
+	Local $aArray [0]
+	While (_Mongo_CursorNext($pCursor,$sNext))
+		Local $copy = $sNext
+		_ArrayAdd ($aArray, $copy)
+	WEnd
+	_Mongo_CursorDestroy($pCursor)
+	return $aArray
+EndFunc
+
 ; #FUNCTION# ====================================================================================================================
 ; Name...........: _Mongo_DeleteOne
 ; Description ...: Find a single document
@@ -260,42 +364,6 @@ Func _Mongo_DeleteOne($pMongocollection, $sQuery)
 EndFunc
 
 ; #FUNCTION# ====================================================================================================================
-; Name...........: _Mongo_CursorNext
-; Description ...: Used to retrieve the next document of the Cursor (mongoc_cursor_t)
-; Syntax.........: CursorNext($pCursor, $sQuery, $sNext)
-; Parameters ....: $pCursor	   	- from a function that returns a cursor
-;                  $sNext		- ByRef variable wich will be populated with the JSON string of next document
-; Return values .: Bool			- true if there there is a next document
-; Author ........: emcodem
-; Modified.......:
-; Remarks .......: Use CursorDestory when you are done to free the memory
-;				   Note that the function returns bool to be used in While. The document content is put to $sNext
-; Related .......: _Mongo_CursorNext, _Mongo_CursorDestroy, _Mongo_FindMany
-; Link ..........:
-; Example .......: Yes
-; ===============================================================================================================================
-Func _Mongo_CursorNext($pCursor, ByRef $sNext)
-
-	Local $tErr  		= __Mongo_MakeErrStruct()
-	Local $pErr 		= DllStructGetPtr($tErr)
-	Local $pResult   	= DllStructGetPtr("")
-	Local $pResultlen   = DllStructGetPtr(0)
-
-	Local $aResult 		= DllCall($__hMongo_1_29_1, "BOOLEAN", "CursorNext", "ptr", $pCursor, "ptr*", $pResult, "UINT64*",$pResultlen, "ptr", $pErr)
-	If ($tErr.code <> 0) Then
-		return SetError($tErr.code, $tErr.code, $tErr.message)
-	EndIf
-	If Not($aResult[0]) Then ;nothing to return
-		return $aResult[0]
-	EndIf
-
-	;shame on me that i did not find a better way to return the $aResult from the dll
-	;could have just returned wchar_t* like in findOne but i wanted the bool as returnval from C side
-	$sNext = DllStructGetData(DllStructCreate("wchar[" & $aResult[3] & "]", $aResult[2]), 1)
-	return $aResult[0] ; bool
-EndFunc
-
-; #FUNCTION# ====================================================================================================================
 ; Name...........: _Mongo_CursorDestroy
 ; Description ...: MANDATORY for any Cursor. Used to free the memory of a Cursor (mongoc_cursor_t)
 ; Syntax.........: _Mongo_CursorDestroy($pCursor, $sQuery, $next_doc)
@@ -318,28 +386,98 @@ EndFunc
 ; Syntax.........: _Mongo_ClientCommandSimple($pMongocollection, $sCmd)
 ; Parameters ....: $pMongocollection   	- from CreateCollection
 ;                  $sCmd				- valid JSON str, mongodb query, used to select the document to be updated
+;				   $bAdmin				- Use "admin" database instead of the collection db
 ; Return values .: JSON String
 ; Author ........: emcodem
 ; Modified.......:
-; Remarks .......: Can do the same as all other methods and much more.
-;					Feature set compareable to mongos shell
+; Remarks .......: Can do the same as all other DB methods and much more
+;					Database name is optional, you can e.g. use "admin" to configure your mongo instance.
+;					Default Database is the same as the collection uses.
 ;   				For commands that return multiple docs, only the first one is returned in cursor.firstBatch
 ; Link ..........: https://mongoc.org/libmongoc/1.29.1/mongoc_client_command_simple.html
 ;				   https://www.mongodb.com/docs/manual/reference/command/
 ; Example .......: Yes
 ; ===============================================================================================================================
-Func _Mongo_ClientCommandSimple($pMongocollection, ByRef $sCmd)
+Func _Mongo_ClientCommandSimple($pMongocollection, $sCmd, $sDatabase = "")
 	;https://www.mongodb.com/docs/manual/reference/command/
-	Local $t1
+	Local $t1,$t2,$t3
 	Local $pCmd 	= __Mongo_MakeWstrPtr($sCmd,$t1)
+	Local $pDb	 	= __Mongo_MakeWstrPtr($sDatabase,$t2)
 	Local $tErr  	= __Mongo_MakeErrStruct()
 	Local $pErr 	= DllStructGetPtr($tErr)
-
-	Local $aResult 	= DllCall($__hMongo_1_29_1, "WSTR", "ClientCommandSimple", "ptr", $pMongocollection, "ptr", $pCmd, "ptr", $pErr);
+	Local $pDatabase= DllStructGetPtr($sDatabase)
+	Local $aResult 	= DllCall($__hMongo_1_29_1, "WSTR", "ClientCommandSimple", "ptr", $pMongocollection, "ptr", $pCmd, "ptr", $pDb,  "ptr", $pErr);
 	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : $aResult[0]
 EndFunc
 
 #EndRegion mongodb.au3 - Functions
+
+#Region JSON/BSON Functions
+
+; #FUNCTION# ====================================================================================================================
+; Name...........: _Mongo_GetJsonVal
+; Description ...: Convenience function to access values of json str using dot notation key.subkey.0.finalkey
+; Syntax.........: _Mongo_GetJsonVal($sJson, "key.subkey", "defaultval")
+; Parameters ....: $sJson   		- valid JSON str
+;                  $sSearch			- dot notated selector, e.g. key.subkey.0.finalkey
+; Return values .: String or JSON string or Array String translated as good as possible from original DB Type
+; Author ........: emcodem
+; Modified.......:
+; Remarks .......: See bson_iter_find_descendant in mongoc docs to learn about mongo dot notation
+;					JSON functions only require the dll handle, not the DB funcs
+; Link ..........: https://mongoc.org/libbson/current/bson_iter_find_descendant
+;				   https://www.mongodb.com/docs/manual/reference/command/
+; Example .......: Yes
+; ===============================================================================================================================
+Func _Mongo_GetJsonVal($sJson, $sSearch, $sDefault = "")
+	Local $t1,$t2,$t3
+	Local $pJson 	= __Mongo_MakeWstrPtr($sJson,$t1)
+	Local $pSearch 	= __Mongo_MakeWstrPtr($sSearch,$t2)
+	Local $pDefault = __Mongo_MakeWstrPtr($sDefault,$t3)
+	Local $tErr 	= __Mongo_MakeErrStruct()
+	Local $pErr 	= DllStructGetPtr($tErr)
+	Local $aResult 	= DllCall($__hMongo_1_29_1, "WSTR", "GetJsonValue","ptr", $pJson, "ptr", $pSearch, "ptr", $pDefault, "ptr", $pErr);
+	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : $aResult[0]
+EndFunc
+
+Func _Mongo_AppendJsonKV($sJson, $sK, $sV="", $selector="")
+	Local $t1,$t2,$t3,$t4
+	Local $pJson	= __Mongo_MakeWstrPtr($sJson,$t1)
+	Local $pK 		= __Mongo_MakeWstrPtr($sK,$t2)
+	Local $pV 		= __Mongo_MakeWstrPtr($sV,$t3)
+	Local $pS 		= __Mongo_MakeWstrPtr($selector,$t4)
+	Local $aResult 	= DllCall($__hMongo_1_29_1, "WSTR", "JsonAppendValue","ptr", $pJson, "ptr", $pK, "ptr", $pV, "ptr", $pS);
+	return $aResult[0]
+EndFunc
+
+Func _Mongo_JsonAppendSubJson($sJson, $sK, $sV='{"key":"value"}', $selector="" )
+	Local $t1,$t2,$t3,$t4
+	Local $pJson	= __Mongo_MakeWstrPtr($sJson,$t1)
+	Local $pK 		= __Mongo_MakeWstrPtr($sK,$t2)
+	Local $pV 		= __Mongo_MakeWstrPtr($sV,$t3)
+	Local $pS 		= __Mongo_MakeWstrPtr($selector,$t4)
+	Local $aResult 	= DllCall($__hMongo_1_29_1, "WSTR", "JsonAppendSubJson","ptr", $pJson, "ptr", $pK, "ptr", $pV, "ptr", $pS);
+	return $aResult[0]
+EndFunc
+
+Func _bson_new_from_json($s)
+	Local $t1
+	Local $pJson	= __Mongo_MakeWstrPtr($s,$t1)
+	Local $aResult 	= DllCall($__hMongo_1_29_1, "PTR", "_bson_new_from_json","ptr", $pJson);
+	return $aResult[0]
+EndFunc
+
+Func _bson_as_canonical_extended_json($p)
+	Local $aResult 	= DllCall($__hMongo_1_29_1, "WSTR", "_bson_as_canonical_extended_json","ptr", $p);
+	return $aResult[0]
+EndFunc
+
+Func _bson_destroy($p)
+	Local $aResult 	= DllCall($__hMongo_1_29_1, "PTR", "_bson_destroy","ptr", $p);
+	return $aResult[0]
+EndFunc
+
+#EndRegion
 
 #Region mongodb.au3 - Functions - MISC
 ; #INTERNAL_USE_ONLY# ===========================================================================================================

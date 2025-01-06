@@ -131,6 +131,7 @@
       <AdditionalIncludeDirectories>$(ProjectDir)\Dependencies\mongo-cxx-driver\include\mongocxx\v_noabi;$(ProjectDir)\Dependencies\mongo-c-driver\include\libbson-1.0;$(ProjectDir)\Dependencies\mongo-cxx-driver\include\bsoncxx\v_noabi;$(ProjectDir)\Dependencies\mongo-c-driver\include\libmongoc-1.0;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -167,12 +168,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="BsonBridge.h" />
+    <ClInclude Include="BsonParser.h" />
     <ClInclude Include="MongoCBridge.h" />
     <ClInclude Include="common.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="utils.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="BsonBridge.cpp" />
+    <ClCompile Include="BsonParser.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="MongoCBridge.cpp" />
     <ClCompile Include="pch.cpp">

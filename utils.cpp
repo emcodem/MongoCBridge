@@ -125,7 +125,40 @@ namespace utils {
         return 1;  // Valid string
     }
 
+    /* BSON UTILS*/
+    static bool lookup_string(
+        const bson_t* bson, const char* key, const char** out, const char* source, mongoc_bulkwriteexception_t* exc)
+    {
+        BSON_ASSERT_PARAM(bson);
+        BSON_ASSERT_PARAM(key);
+        BSON_ASSERT_PARAM(out);
+        BSON_OPTIONAL_PARAM(source);
+        BSON_ASSERT_PARAM(exc);
 
+        bson_iter_t iter;
+        if (bson_iter_init_find(&iter, bson, key) && BSON_ITER_HOLDS_UTF8(&iter)) {
+            *out = bson_iter_utf8(&iter, NULL);
+            return true;
+        }
+        bson_error_t error;
+        if (source) {
+            bson_set_error(&error,
+                MONGOC_ERROR_COMMAND,
+                MONGOC_ERROR_COMMAND_INVALID_ARG,
+                "expected to find string `%s` in %s, but did not",
+                key,
+                source);
+        }
+        else {
+            bson_set_error(&error,
+                MONGOC_ERROR_COMMAND,
+                MONGOC_ERROR_COMMAND_INVALID_ARG,
+                "expected to find string `%s`, but did not",
+                key);
+        }
+        
+        return false;
+    }
 
 
 }
