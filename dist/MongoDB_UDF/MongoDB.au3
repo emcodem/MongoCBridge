@@ -52,9 +52,9 @@ Func _Mongo_Init($sInstallDir = @ScriptDir & "\include\MongoDB_UDF\")
 		ConsoleWriteError("Not found: " & $sBridgeDllPath)
 		Exit(42)
 	EndIf
-	_WinAPI_SetDllDirectory ($sMongoCDllPath)
+	;_WinAPI_SetDllDirectory ($sMongoCDllPath)
 	Global CONST $__hMongo_1_29_1 = DllOpen($sBridgeDllPath)
-	_WinAPI_SetDllDirectory()
+	;_WinAPI_SetDllDirectory()
 	If (@error) Then
 		ConsoleWriteError("MongocBridgeDll")
 	EndIf

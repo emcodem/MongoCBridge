@@ -6,9 +6,7 @@
     <ClCompile Include="pch.cpp" />
     <ClCompile Include="utils.cpp" />
     <ClCompile Include="BsonParser.cpp" />
-    <ClCompile Include="BsonBridge.cpp">
-      <Filter>headers</Filter>
-    </ClCompile>
+    <ClCompile Include="BsonBridge.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="common.h">

@@ -1,7 +1,8 @@
 #include "pch.h"
 #include "BsonBridge.h"
 #include "utils.h"
-#define DECLDIR __declspec(dllexport)
+
+
 
 /*
     Prototype to expose native bson functions, we used that for benchmarking.
@@ -9,8 +10,9 @@
 */
 extern "C"
 {
-    // DLL Exports
 
+    // DLL Exports
+    #define DECLDIR __declspec(dllexport)
     DECLDIR bson_t* _bson_new_from_json(wchar_t* utf16String, struct ErrorStruct* err) {
         bson_error_t error;
         std::string _json = utils::wide_string_to_string(utf16String);

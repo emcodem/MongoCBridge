@@ -1,15 +1,17 @@
 #include <wchar.h>
-#define DECLDIR __declspec(dllexport)
 
 
+#define BSON_STATIC
+#define MONGOC_STATIC
 #include <mongoc/mongoc.h>
 
 #include "utils.h"
 
+
 extern "C"
 {
     // DLL Exports
-    
+    #define DECLDIR __declspec(dllexport)
     
     DECLDIR wchar_t* Echo( wchar_t* utf16String);  // Function takes a pointer to MyStructure
 
