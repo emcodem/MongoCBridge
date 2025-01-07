@@ -1,8 +1,6 @@
 #include <wchar.h>
-#include <mongoc/mongoc.h>
-
+#include "common.h"
 #include "utils.h"
-
 
 extern "C"
 {
@@ -19,12 +17,12 @@ extern "C"
     DECLDIR int         InsertOne(mongoc_collection_t* c, wchar_t* utf16String, struct ErrorStruct* err);
     DECLDIR bool        InsertMany(mongoc_collection_t* c, wchar_t* utf16ArrayOfJsons, struct ErrorStruct* err);
     DECLDIR wchar_t*    FindOne(mongoc_collection_t* c, wchar_t* query, wchar_t* utf_16_options, wchar_t* top_level_field, struct ErrorStruct* err);
-    
     DECLDIR wchar_t*    UpdateOne(mongoc_collection_t* c, wchar_t* utf16_search, wchar_t* utf16_update, wchar_t* utf16_options, struct ErrorStruct* err);
     DECLDIR int         DeleteOne(mongoc_collection_t* c, wchar_t* utf16_search, struct ErrorStruct* err);
     DECLDIR mongoc_cursor_t* FindMany(mongoc_collection_t* c, wchar_t* utf16_query_json, wchar_t* utf_16_options, struct ErrorStruct* err);
-    DECLDIR mongoc_cursor_t* _Collection_Aggregate(mongoc_collection_t* c, wchar_t* pipeline, wchar_t* opts, struct ErrorStruct* err);
-    DECLDIR bool        CursorNext(mongoc_cursor_t* cursor, wchar_t*& result, UINT64* resultlen, struct ErrorStruct* err);
+    DECLDIR mongoc_cursor_t* Collection_Aggregate(mongoc_collection_t* c, wchar_t* pipeline, wchar_t* opts, struct ErrorStruct* err);
+    DECLDIR int64_t         CountDocuments(mongoc_collection_t* c, wchar_t* utf16query, wchar_t* utf16opts, struct ErrorStruct* err);
+    DECLDIR bool        CursorNext(mongoc_cursor_t* cursor, wchar_t*& result, UINT64* resultlen, wchar_t* selector, struct ErrorStruct* err);
     DECLDIR wchar_t*    ClientCommandSimple(mongoc_collection_t* c, wchar_t* utf_16_command, wchar_t* database, struct ErrorStruct* err);
 
     /**
@@ -69,7 +67,8 @@ namespace impl {
     int         _DeleteOne(mongoc_collection_t* c, wchar_t* query, struct ErrorStruct* err);
     mongoc_cursor_t* _FindMany(mongoc_collection_t* c, wchar_t* utf16_query_json, wchar_t* utf_16_options, struct ErrorStruct* err);
     mongoc_cursor_t* _Collection_Aggregate(mongoc_collection_t* c, wchar_t* pipeline, wchar_t* opts, struct ErrorStruct* err);
-    bool        _CursorNext(mongoc_cursor_t* cursor, wchar_t*& result, UINT64* resultlen, struct ErrorStruct* err);
+    int64_t         _CountDocuments(mongoc_collection_t* c, wchar_t* utf16query, wchar_t* utf16opts, struct ErrorStruct* err);
+    bool        _CursorNext(mongoc_cursor_t* cursor, wchar_t*& result, UINT64* resultlen, wchar_t* selector, struct ErrorStruct* err);
     
     wchar_t*    _ClientCommandSimple(mongoc_collection_t* c, wchar_t* utf_16_command, wchar_t* database, struct ErrorStruct* err);
     

@@ -2,6 +2,7 @@
 #include <Date.au3>
 #include <file.au3>
 #include <WinAPISys.au3>
+#include "MongoDB_UDF\MongoDB_SimpleJson.au3"
 #include "C:\dev\FFAStrans\Processors\_indep_funcs.au3"
 #include "C:\dev\FFAStrans\Processors\_ffastrans_funcs.au3"
 
@@ -37,6 +38,7 @@ Local $begin = TimerInit()
 ; ensures unique index, done only at startup or on new DB setup
 _Mongo_ClientCommandSimple($pMCCONFIGS,$makeIndexCmd)
 
+
 Local $a_f = _FileListToArrayRec("C:\temp\ffastrans1407\Processors\db","*.json||jobs;mons",1,1,1,1)
 _ArrayDisplay($a_f)
 
@@ -47,6 +49,8 @@ For $i = 1 to UBound($a_f) -1
     
     _DB_FileWrite($_f,$_cont)
 Next
+
+Exit (10001)
 
 Local $hFind = _DB_FileFindFirstFile("c:\temp\*\*.json")
 If (@error) Then
@@ -138,6 +142,9 @@ Func _InitFileEntry($sPath, $sDataJSON)
     Local $modified = @YEAR & '-' & @MON & '-' & @MDAY & 'T' & @HOUR & ':' & @MIN & ':' & @SEC & '.' & @MSEC & "+01:00" ;todo: use correct gmt bias!
     Local $_onInsert = '"$setOnInsert": {"ct": { "$date": "' & $modified & '" }' ;sets creation time only if document does not exist
     Local $_mt = '"mt": { "$date": "' & $modified & '" }'
+    
+    $szFName &=  $szExt
+    
     ;research shows this is the fastest way to create this with large DataJSON
 	Local $s = '{"$set":{' & $_mt & ' ,"name":"'&_JSafe($szFName)&'","dir":"'&_JSafe($szDir) & '","full":"'&_JSafe($sPath) & '","data":' & $sDataJSON & '},' & $_onInsert & '}}'
 	return $s
@@ -237,7 +244,6 @@ Exit(0)
 Local $json_path_in = "C:\temp\ffastrans1407\Processors\db\configs\workflows"
 Local $relpath 		= "workflows"
 Local $aFileList = _FileListToArray($json_path_in, "*", 1)
-
 Local $val
 
 Exit(0)
@@ -305,55 +311,5 @@ Func _Map2D(Const ByRef $mMap)
     Return $aMap2D
 EndFunc
 
-#Region Simple Json helpers
-
-Func _Jkv($key,$val)
-	return StringFormat('{"%s":"%s"}', _JSafe($key), _JSafe($val))
-EndFunc
-
-Func _Jkj($key,$val)
-	return StringFormat('{"%s":%s}', _JSafe($key), $val)
-EndFunc
-
-Func _JSafe($sString)
-    ; Initialize the escaped string
-    Local $sEscapedString = ""
-
-    ; Loop through each character in the input string
-    For $i = 1 To StringLen($sString)
-        Local $char = StringMid($sString, $i, 1)
-
-        ; Check for special JSON characters and escape them
-        Switch $char
-            Case '"'
-                $sEscapedString &= '\"'
-            Case '\'
-                $sEscapedString &= '\\'
-            Case '/'
-                $sEscapedString &= '\/'
-            Case Chr(8) ; Backspace
-                $sEscapedString &= '\b'
-            Case Chr(12) ; Formfeed
-                $sEscapedString &= '\f'
-            Case Chr(10) ; Newline
-                $sEscapedString &= '\n'
-            Case Chr(13) ; Carriage return
-                $sEscapedString &= '\r'
-            Case Chr(9) ; Tab
-                $sEscapedString &= '\t'
-			Case Else    ; If the character is non-printable, encode it as \uXXXX
-                If Asc($char) < 32 Or Asc($char) > 126 Then
-                    $sEscapedString &= "\\u" & StringFormat("%04X", Asc($char))
-                Else
-                    ; Otherwise, append the character as is
-                    $sEscapedString &= $char
-                EndIf
-        EndSwitch
-    Next
-
-    Return $sEscapedString
-EndFunc
-
-#EndRegion Simple JSON helpers
 
 

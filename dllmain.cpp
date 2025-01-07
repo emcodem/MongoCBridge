@@ -2,8 +2,6 @@
 //  removed _DEBUG preprocessor definition from C++/Preprocessor project properties
 #include "pch.h"
 
-
-
 BOOL APIENTRY DllMain( HMODULE hModule,
                        DWORD  ul_reason_for_call,
                        LPVOID lpReserved

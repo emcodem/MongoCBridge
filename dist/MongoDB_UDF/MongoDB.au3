@@ -47,7 +47,7 @@ Opt("MustDeclareVars", 1)
 ; ===============================================================================================================================
 Func _Mongo_Init($sInstallDir = @ScriptDir & "\include\MongoDB_UDF\")
 	Local $sBridgeDllPath = $sInstallDir & "\dependencies\MongoCBridge.dll"
-	Local $sMongoCDllPath = $sInstallDir & "\dependencies\mongoc_driver_1.29.1"
+	;Local $sMongoCDllPath = $sInstallDir & "\dependencies\mongoc_driver_1.29.1"
 	If Not(FileExists ( $sBridgeDllPath )) Then
 		ConsoleWriteError("Not found: " & $sBridgeDllPath)
 		Exit(42)
@@ -204,6 +204,8 @@ EndFunc
 ;                  $sQuery					- valid JSON str, mongodb query
 ;                  $sProjection				- valid JSON str, which fields to return
 ;				   $sTopLevelField			- str, this is not part of mongo but our own invention, forces return content of this top level field
+
+
 ; Return values .: JSON String, the document found or {}
 ; Author ........: emcodem
 ; Modified.......:
@@ -249,6 +251,33 @@ Func _Mongo_Coll_Aggregate($pMongocollection, $sPipeline, $sOpts = "{}")
 	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : $aResult[0]
 EndFunc
 
+
+; #FUNCTION# ====================================================================================================================
+; Name...........: _Mongo_CountDocs
+; Description ...: Counts docs by query
+; Syntax.........: _Mongo_CountDocs($pMongocollection, $sQuery, $sOpts)
+; Parameters ....: $pMongocollection   		- from CreateCollection
+;                  $sQuery        			- valid JSON str, normal query
+;				   $sOpts					- count opts (usually {})
+; Return values .: Int64 
+; Author ........: emcodem
+; Modified.......:
+; Remarks .......:
+; Link ..........:
+; Example .......: Yes
+; ===============================================================================================================================
+Func _Mongo_CountDocs($pMongocollection, $sQuery, $sOpts = "{}")
+	Local $t1,$t2
+	Local $pQuery 	= __Mongo_MakeWstrPtr($sQuery,$t1)
+	Local $pOpts 	= __Mongo_MakeWstrPtr($sOpts,$t2)
+	Local $tErr  	= __Mongo_MakeErrStruct()
+	Local $pErr 	= DllStructGetPtr($tErr)
+
+	Local $aResult 	= DllCall($__hMongo_1_29_1, "INT64:cdecl", "CountDocuments", "ptr", $pMongocollection, "ptr", $pQuery, "ptr", $pOpts, "ptr", $pErr)
+	
+	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : $aResult[0]
+EndFunc
+
 ; #FUNCTION# ====================================================================================================================
 ; Name...........: _Mongo_FindMany
 ; Description ...: Find multiple documents
@@ -281,6 +310,9 @@ EndFunc
 ; Syntax.........: CursorNext($pCursor, $sQuery, $sNext)
 ; Parameters ....: $pCursor	   	- from a function that returns a cursor
 ;                  $sNext		- ByRef variable wich will be populated with the JSON string of next document
+;				   $sSelector	- dot notated selector, e.g. key.subkey.0.finalkey, for convenience and save time parsing json
+;								- Selector will be applied to the query result, 
+;								- it is a replacement for projection in query but can also return non json values
 ; Return values .: Bool			- true if there there is a next document
 ; Author ........: emcodem
 ; Modified.......:
@@ -291,21 +323,22 @@ EndFunc
 ; Link ..........:
 ; Example .......: Yes
 ; ===============================================================================================================================
-Func _Mongo_CursorNext($pCursor, ByRef $sNext)
-
+Func _Mongo_CursorNext($pCursor, ByRef $sNext,  $sSelector = "")
+	Local $t1
 	Local $tErr  		= __Mongo_MakeErrStruct()
 	Local $pErr 		= DllStructGetPtr($tErr)
 	Local $pResult   	= DllStructGetPtr("")
 	Local $pResultlen   = DllStructGetPtr(0)
+	Local $pSelector 	= __Mongo_MakeWstrPtr($sSelector,$t1)
 
-	Local $aResult 		= DllCall($__hMongo_1_29_1, "BOOLEAN", "CursorNext", "ptr", $pCursor, "ptr*", $pResult, "UINT64*",$pResultlen, "ptr", $pErr)
+	Local $aResult 		= DllCall($__hMongo_1_29_1, "BOOLEAN", "CursorNext", "ptr", $pCursor, "ptr*", $pResult, "UINT64*",$pResultlen,"ptr",  $pSelector, "ptr", $pErr)
 	If ($tErr.code <> 0) Then
-		ConsoleWrite("Cursor Error " & $tErr.message)
-		SetError($tErr.code, $tErr.code, $tErr.message)
+		ConsoleWrite("Cursor Error " & $tErr.message & @CRLF)
+		return SetError($tErr.code, $tErr.code, $tErr.message)
 	EndIf
 	
 	If Not($aResult[0]) Then ;nothing to write to sNext
-		return SetError(47)
+		return False
 	EndIf
 
 	;shame on me that i did not find a better way to return the $aResult from the dll
@@ -317,8 +350,9 @@ EndFunc
 ; #FUNCTION# ====================================================================================================================
 ; Name...........: _Mongo_Cursor_To_Array
 ; Description ...: Convenience Function to retrieve all items of cursor and auto close it
-; Syntax.........: CursorNext($pCursor, $sQuery, $sNext)
-; Parameters ....: $pCursor (returned by a Function like FindMany)
+; Syntax.........: _Mongo_Cursor_To_Array($pCursor, $sSelector="")
+; Parameters ....:  $pCursor (returned by a Function like FindMany)
+;   				$sSelector = "" see _Mongo_CursorNext
 ; Return values .: Array
 ; Author ........: emcodem
 ; Modified.......:
@@ -328,12 +362,17 @@ EndFunc
 ; Link ..........:
 ; Example .......: Yes
 ; ===============================================================================================================================
-Func _Mongo_Cursor_To_Array($pCursor)
+Func _Mongo_Cursor_To_Array($pCursor,$sSelector = "")
 	Local $sNext
 	Local $aArray [0]
-	While (_Mongo_CursorNext($pCursor,$sNext))
+	While (_Mongo_CursorNext($pCursor,$sNext,"full"))
+		If (@error) And ( @error <> 47) Then
+			ConsoleWrite("_Mongo_Cursor_To_Array error " & @error & @CRLF)
+			return SetError(@error)
+		EndIf
 		Local $copy = $sNext
 		_ArrayAdd ($aArray, $copy)
+
 	WEnd
 	_Mongo_CursorDestroy($pCursor)
 	return $aArray
@@ -419,7 +458,7 @@ EndFunc
 ; Description ...: Convenience function to access values of json str using dot notation key.subkey.0.finalkey
 ; Syntax.........: _Mongo_GetJsonVal($sJson, "key.subkey", "defaultval")
 ; Parameters ....: $sJson   		- valid JSON str
-;                  $sSearch			- dot notated selector, e.g. key.subkey.0.finalkey
+;                  $sSelector			- dot notated selector, e.g. key.subkey.0.finalkey
 ; Return values .: String or JSON string or Array String translated as good as possible from original DB Type
 ; Author ........: emcodem
 ; Modified.......:
@@ -429,14 +468,14 @@ EndFunc
 ;				   https://www.mongodb.com/docs/manual/reference/command/
 ; Example .......: Yes
 ; ===============================================================================================================================
-Func _Mongo_GetJsonVal($sJson, $sSearch, $sDefault = "")
+Func _Mongo_GetJsonVal($sJson, $sSelector, $sDefault = "")
 	Local $t1,$t2,$t3
 	Local $pJson 	= __Mongo_MakeWstrPtr($sJson,$t1)
-	Local $pSearch 	= __Mongo_MakeWstrPtr($sSearch,$t2)
+	Local $pSelector= __Mongo_MakeWstrPtr($sSelector,$t2)
 	Local $pDefault = __Mongo_MakeWstrPtr($sDefault,$t3)
 	Local $tErr 	= __Mongo_MakeErrStruct()
 	Local $pErr 	= DllStructGetPtr($tErr)
-	Local $aResult 	= DllCall($__hMongo_1_29_1, "WSTR", "GetJsonValue","ptr", $pJson, "ptr", $pSearch, "ptr", $pDefault, "ptr", $pErr);
+	Local $aResult 	= DllCall($__hMongo_1_29_1, "WSTR", "GetJsonValue","ptr", $pJson, "ptr", $pSelector, "ptr", $pDefault, "ptr", $pErr);
 	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : $aResult[0]
 EndFunc
 

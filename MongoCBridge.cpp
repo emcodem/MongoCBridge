@@ -83,9 +83,13 @@ extern "C"
         return impl::_Collection_Aggregate(c, pipeline, opts, err);
     }
     
+    DECLDIR int64_t CountDocuments(mongoc_collection_t* c, wchar_t* utf16query, wchar_t* utf16opts, struct ErrorStruct* err) {
+        
+        return impl::_CountDocuments( c,  utf16query,  utf16opts, err);
+    }
 
-    DECLDIR bool CursorNext(mongoc_cursor_t* cursor, wchar_t*& result, UINT64* resultlen, struct ErrorStruct* err) {
-        return impl::_CursorNext(cursor, result, resultlen, err);
+    DECLDIR bool CursorNext(mongoc_cursor_t* cursor, wchar_t*& result, UINT64* resultlen, wchar_t* selector, struct ErrorStruct* err) {
+        return impl::_CursorNext(cursor, result, resultlen, selector, err);
     }
 
     DECLDIR wchar_t* ClientCommandSimple(mongoc_collection_t* c, wchar_t* utf_16_command, wchar_t* database, struct ErrorStruct* err){
@@ -526,12 +530,52 @@ namespace impl {
         return results;
     }
 
-    bool _CursorNext(mongoc_cursor_t* cursor, wchar_t*& result, UINT64* resultlen, struct ErrorStruct* err)
-    {
-        const bson_t* doc;
-        bson_error_t error;
+    int64_t _CountDocuments(mongoc_collection_t* c, wchar_t* utf16query, wchar_t* utf16opts, struct ErrorStruct* err) {
         
-        if (mongoc_cursor_next(cursor, &doc)) {
+        bson_error_t error;
+        bson_t* selector = utils::wchar_to_bson_t(utf16query);
+        bson_t* opts = utils::wchar_to_bson_t(utf16opts);
+
+        int64_t count = mongoc_collection_count_documents(c, selector, opts, NULL, NULL, &error);
+       
+        bson_destroy(selector);
+        bson_destroy(opts);
+
+        if (error.code) {
+            MONGOC_ERROR("_CountDocuments error: %s\n", error.message);
+            utils::bsonErrtoStruct(error, err);
+            return 0;
+        }
+
+        return count;
+
+    }
+
+    bool _CursorNext(mongoc_cursor_t* cursor, wchar_t*& result, UINT64* resultlen, wchar_t* selector, struct ErrorStruct* err)
+    {
+        bson_t* doc;
+        bson_error_t error;
+        bson_iter_t iter;
+
+        if (!utils::is_valid_wstring(selector) ) {
+            selector = (wchar_t*)L"";
+        }
+
+        if (mongoc_cursor_next(cursor, (const bson_t**) & doc)) {
+            
+            std::string sselector = utils::wide_string_to_string(selector);
+            //if selector, search into bson
+            if (strcmp(sselector.c_str(), "") != 0) {
+                if (bson_iter_init(&iter, doc) && bson_iter_find_descendant(&iter, sselector.c_str(), &iter)) {
+                    // If the path exists, append the key-value pair at the found location
+                    const char* key = bson_iter_key(&iter);
+                    result = bsonparser::convert_bson_iter_value(&iter);
+                    *resultlen = wcslen(result);
+                    bson_destroy((bson_t*)doc);
+                    return true;
+                }
+            }
+            //else or default return doc
             char* charptr = bson_as_canonical_extended_json(doc, NULL);
             std::string str(charptr);
             result = utils::string_to_wide_string(str);
@@ -540,7 +584,7 @@ namespace impl {
             return true;
         }
         if (mongoc_cursor_error(cursor, &error)) {
-            MONGOC_ERROR( "_CursorNext Error: %s\n", error.message);
+            MONGOC_ERROR( "_CursorNext Error: %d, %s\n",error.code, error.message);
             utils::bsonErrtoStruct(error, err);
             return false;
         }

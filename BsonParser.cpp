@@ -1,7 +1,6 @@
 #include "pch.h"
 #include "utils.h"
 
-
 extern "C" {
 
     #include "BsonParser.h"

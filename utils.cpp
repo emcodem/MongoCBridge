@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "utils.h"
-#include <mongoc/mongoc.h>
 #include "MongoCBridge.h"
 #include <cwchar> 
 #include <cstring>

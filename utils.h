@@ -1,11 +1,10 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#include "pch.h"
 #include <string>
 #include <stdexcept>
 #include <Windows.h>
-#include <bson.h>
-
 
 namespace utils {
 
