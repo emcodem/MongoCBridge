@@ -1,7 +1,5 @@
 #include "pch.h"
 #include "utils.h"
-#define BSON_STATIC
-#define MONGOC_STATIC
 #include <mongoc/mongoc.h>
 #include "MongoCBridge.h"
 #include <cwchar> 

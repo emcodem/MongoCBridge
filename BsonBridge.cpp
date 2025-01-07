@@ -2,8 +2,6 @@
 #include "BsonBridge.h"
 #include "utils.h"
 
-
-
 /*
     Prototype to expose native bson functions, we used that for benchmarking.
     The plan can be to allow the user of MongoCbridge to either work with wchar*t or with bson*t which should improve performance dramatically

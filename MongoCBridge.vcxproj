@@ -137,9 +137,9 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>$(ProjectDir)Dependencies\mongo-c-driver\lib\MT\Debug\bson-static-1.0.lib;$(ProjectDir)Dependencies\mongo-c-driver\lib\MT\Debug\mongoc-static-1.0.lib;ws2_32.lib;Secur32.lib;Crypt32.lib;BCrypt.lib;DnsAPI.Lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(ProjectDir)Dependencies\mongo-c-driver\lib\MT\Release\bson-static-1.0.lib;$(ProjectDir)Dependencies\mongo-c-driver\lib\MT\Release\mongoc-static-1.0.lib;ws2_32.lib;Secur32.lib;Crypt32.lib;BCrypt.lib;DnsAPI.Lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(ProjectDir)\Dependencies\mongo-c-driver\lib\</AdditionalLibraryDirectories>
-      <AdditionalOptions>/NODEFAULTLIB:MSVCRT</AdditionalOptions>
+      <AdditionalOptions>/NODEFAULTLIB:MSVCRTD</AdditionalOptions>
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
     </Link>
     <Manifest>
@@ -167,7 +167,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
       <AdditionalDependencies>libcmt.lib;$(ProjectDir)Dependencies\mongo-c-driver\lib\MT\Release\bson-static-1.0.lib;$(ProjectDir)Dependencies\mongo-c-driver\lib\MT\Release\mongoc-static-1.0.lib;ws2_32.lib;Secur32.lib;Crypt32.lib;BCrypt.lib;DnsAPI.Lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalOptions>/NODEFAULTLIB:msvcrt.lib </AdditionalOptions>
+      <AdditionalOptions>/NODEFAULTLIB:msvcrt.lib</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

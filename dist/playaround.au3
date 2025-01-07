@@ -21,6 +21,7 @@ Local $s_mongo_collection_name 	= "configs"
 Local $sResult
 ;_MongoRunJsonTests()
 ;Initialize mongodb driver
+MsgBox(0,0,0)
 Local $pMCCONFIGS = _Mongo_CreateCollection($s_mongo_url, $s_mongo_database_name, $s_mongo_collection_name)
 
 Local $listIndexCmd = _Jkv("listIndexes",$s_mongo_collection_name) ;List indexes example

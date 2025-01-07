@@ -1,8 +1,4 @@
 #include <wchar.h>
-
-
-#define BSON_STATIC
-#define MONGOC_STATIC
 #include <mongoc/mongoc.h>
 
 #include "utils.h"
