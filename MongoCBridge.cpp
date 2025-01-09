@@ -33,7 +33,7 @@ extern "C"
     }
 
     DECLDIR void SetLogFile(wchar_t* filePath, struct ErrorStruct* err) {
-        return impl::_setLogHandler(filePath,err);
+        return impl::_setLogFile(filePath,err);
     }
 
     DECLDIR void* CursorDestroy(mongoc_cursor_t* cursor) {
@@ -50,7 +50,7 @@ extern "C"
         return c;
     }
 
-    DECLDIR int InsertOne(mongoc_collection_t* c, wchar_t* utf16String, struct ErrorStruct* err)
+    DECLDIR bool InsertOne(mongoc_collection_t* c, wchar_t* utf16String, struct ErrorStruct* err)
     {
         return impl::_InsertOne(c, utf16String, err);
     }
@@ -60,9 +60,9 @@ extern "C"
         return impl::_InsertMany(c, utf16ArrayOfJsons, err);
     }
 
-    DECLDIR wchar_t* FindOne(mongoc_collection_t* c, wchar_t* query, wchar_t* utf_16_options, wchar_t* top_level_field, struct ErrorStruct* err)
+    DECLDIR wchar_t* FindOne(mongoc_collection_t* c, wchar_t* query, wchar_t* utf_16_options, wchar_t* selector, struct ErrorStruct* err)
     {
-        return impl::_FindOne(c, query, utf_16_options, top_level_field, err);
+        return impl::_FindOne(c, query, utf_16_options, selector, err);
     }
 
     DECLDIR wchar_t* UpdateOne(mongoc_collection_t* c, wchar_t* utf16_search, wchar_t* utf16_update, wchar_t* utf16_options, struct ErrorStruct* err)
@@ -70,7 +70,7 @@ extern "C"
         return impl::_UpdateOne(c, utf16_search, utf16_update, utf16_options, err);
     }
 
-    DECLDIR int DeleteOne(mongoc_collection_t* c, wchar_t* utf16_search, struct ErrorStruct* err)
+    DECLDIR bool DeleteOne(mongoc_collection_t* c, wchar_t* utf16_search, struct ErrorStruct* err)
     {
         return impl::_DeleteOne(c, utf16_search, err);
     }
@@ -110,7 +110,8 @@ extern "C"
         bsonparser::insert_bson_at_selector(original_bson, _selector.c_str(), _key.c_str(), to_append);
 
         // Convert the updated BSON document back to JSON
-        char* json_out = bson_as_canonical_extended_json(original_bson, NULL);
+        
+        char* json_out = bson_as_relaxed_extended_json(original_bson, NULL);
         std::string sjout(json_out);
         wchar_t* result = utils::string_to_wide_string(sjout);  // Convert the JSON back to wchar_t*
 
@@ -289,7 +290,7 @@ namespace impl {
         }
     }
 
-    int _InsertOne(mongoc_collection_t* c, wchar_t* utf16Doc, struct ErrorStruct* err) {
+    bool _InsertOne(mongoc_collection_t* c, wchar_t* utf16Doc, struct ErrorStruct* err) {
 
         bson_error_t error;
         bson_t* b;
@@ -299,209 +300,296 @@ namespace impl {
         if (error.code != 0) {
             MONGOC_ERROR("Invalid json, %s",error.message);
             utils::bsonErrtoStruct(error, err); //ensure error is set
-            return NULL;
+            return false;
         }
 
         if (!mongoc_collection_insert_one(
             c, b, NULL, NULL, &error)) {
             MONGOC_ERROR("mongoc_collection_insert_one error: %s\n", error.message);
             utils::bsonErrtoStruct(error, err); //ensure error is set
-            return NULL;
+            return false;
         }
 
         bson_destroy(b);
-        return 0;
+        return true;
     }
-
+   
     bool _InsertMany(mongoc_collection_t* c, wchar_t* utf16ArrayOfJsons, struct ErrorStruct* err) {
-
         bson_error_t error;
-        bson_t* b;
+        bson_t* b = NULL;
+        bson_iter_t iter;
 
-        std::string yip = utils::wide_string_to_string(utf16ArrayOfJsons);
-        b = bson_new_from_json((const uint8_t*)yip.c_str(), yip.size(), &error);
-        if (error.code != 0) {
+        // Convert the input JSON string to BSON
+        std::string json_str = utils::wide_string_to_string(utf16ArrayOfJsons);
+        b = bson_new_from_json((const uint8_t*)json_str.c_str(), json_str.size(), &error);
+
+        if (!b) {
+            // Conversion to BSON failed
             utils::bsonErrtoStruct(error, err);
             return false;
         }
 
-        bson_iter_t iter; //the exapmles do not free this, so we do not either
+        bson_t** docs = NULL;  // Array to hold BSON documents
         size_t doc_count = 0;
-        bson_t** docs = NULL;
-                
-        if (bson_iter_init(&iter, b)) {
-            while (bson_iter_next(&iter)) {
-                const bson_value_t* bval = bson_iter_value(&iter);
-                if (bval->value_type != BSON_TYPE_DOCUMENT && bval->value_type != BSON_TYPE_ARRAY) {
-                    MONGOC_ERROR("_InsertMany Skipping non-document or non-array value.");
-                    utils::charErrtoStruct(1, "Skipping non-document or non-array value.",err);
-                    free(docs);
-                    bson_destroy(b);
-                    return false;
-                }
-                
-                const uint8_t* data = bval->value.v_doc.data;
-                uint32_t length = bval->value.v_doc.data_len;
-                bson_t* doc = bson_new_from_data(data, length);
-                bson_t** new_docs = (bson_t**)realloc(docs, (doc_count + 1) * sizeof(bson_t*));
-                if (!new_docs) {
-                    // Exit on allocation failure
-                    MONGOC_ERROR("_InsertMany Memory allocation failed for docs array.\n");
-                    utils::charErrtoStruct(1, "_InsertMany Memory allocation failed for docs array.\n", err);
-                    bson_destroy(doc);
-                    break;  
-                }
-                // Add the new document to the array
-                docs = new_docs;
-                docs[doc_count] = doc;  
-                doc_count++;
-            }
-            mongoc_collection_insert_many(c, (const bson_t**)docs, doc_count, NULL, NULL, NULL);
-        }
-        else {
+
+        // Initialize the iterator
+        if (!bson_iter_init(&iter, b)) {
             bson_destroy(b);
-            free(docs);
-            MONGOC_ERROR("Could not create iterator for the document list");
-            utils::charErrtoStruct(1, "Could not create iterator for the document list", err);
+            utils::charErrtoStruct(1, "Could not initialize iterator for the document list", err);
+            return false;
+        }
+
+        // Iterate through the array of BSON documents
+        while (bson_iter_next(&iter)) {
+            const bson_value_t* bval = bson_iter_value(&iter);
+
+            // Only process documents or arrays
+            if (bval->value_type != BSON_TYPE_DOCUMENT && bval->value_type != BSON_TYPE_ARRAY) {
+                MONGOC_ERROR("_InsertMany: Skipping non-document or non-array value.");
+                utils::charErrtoStruct(1, "Skipping non-document or non-array value.", err);
+                continue;
+            }
+
+            // Extract the document data
+            const uint8_t* data = bval->value.v_doc.data;
+            uint32_t length = bval->value.v_doc.data_len;
+
+            bson_t* doc = bson_new_from_data(data, length);
+            if (!doc) {
+                MONGOC_ERROR("_InsertMany: Failed to create BSON document from data.");
+                utils::charErrtoStruct(1, "Failed to create BSON document from data.", err);
+                continue;
+            }
+
+            // Resize the docs array
+            bson_t** new_docs = (bson_t**)realloc(docs, (doc_count + 1) * sizeof(bson_t*));
+            if (!new_docs) {
+                MONGOC_ERROR("_InsertMany: Memory allocation failed for docs array.");
+                utils::charErrtoStruct(1, "Memory allocation failed for docs array.", err);
+                bson_destroy(doc);
+                break;
+            }
+
+            docs = new_docs;
+            docs[doc_count] = doc;  // Add the document to the array
+            doc_count++;
+        }
+
+        // Insert the documents into the collection
+        if (doc_count > 0) {
+            if (!mongoc_collection_insert_many(c, (const bson_t**)docs, doc_count, NULL, NULL, &error)) {
+                MONGOC_ERROR("_InsertMany: InsertMany failed: %s", error.message);
+                utils::bsonErrtoStruct(error, err);
+
+                // Clean up and free allocated memory
+                for (size_t i = 0; i < doc_count; i++) {
+                    bson_destroy(docs[i]);
+                }
+                free(docs);
+                bson_destroy(b);
+                return false;
+            }
+        }
+
+        // Clean up and free allocated memory
+        for (size_t i = 0; i < doc_count; i++) {
+            bson_destroy(docs[i]);
+        }
+        free(docs);
+        bson_destroy(b);
+
+        return true;
+    }
+
+    wchar_t* _FindOne(mongoc_collection_t* c, wchar_t* utf16_query_json, wchar_t* utf16_options, wchar_t* selector, struct ErrorStruct* err) {
+        bson_t* filter = NULL;
+        bson_t* opts = NULL;
+        bson_error_t error;
+
+        if (!utils::is_valid_wstring(utf16_options)) {
+            utf16_options = (wchar_t*)L"{}";
+        }
+        opts = utils::wchar_to_bson_t(utf16_options);
+        if (!opts) {
+            utils::charErrtoStruct(400, "InvalidOptionsJSON", err);
+            return NULL;
+        }
+        if (!utils::is_valid_wstring(selector)) {
+            selector = (wchar_t*)L"";
+        }
+        std::string s_selector = utils::wide_string_to_string(selector);
+
+        // Convert the query JSON to BSON
+        std::string utf8_query = utils::wide_string_to_string(utf16_query_json);
+        filter = bson_new_from_json((const uint8_t*)utf8_query.c_str(), utf8_query.size(), &error);
+        if (!filter) {
+            utils::bsonErrtoStruct(error, err);
+            bson_destroy(opts);
             return NULL;
         }
 
-        bson_destroy(b);
-        free(docs);
-
-        return 0;
-    }
-
-
-    wchar_t* _FindOne(mongoc_collection_t* c, wchar_t* utf16_query_json, wchar_t* utf_16_options, wchar_t* top_level_field, struct ErrorStruct* err)
-    {
-        bson_t* filter;
-        bson_t* doc;
-        bson_error_t error;
-        if (!utils::is_valid_wstring(utf_16_options)) {
-            utf_16_options = (wchar_t*)L"{}";
-        }
-        bson_t* opts = utils::wchar_to_bson_t(utf_16_options);
-        if (!utils::is_valid_wstring(top_level_field)) {
-            top_level_field = (wchar_t*)L"";
-        }
-        std::string s_toplevelfield = utils::wide_string_to_string(top_level_field);
-
-        std::string utf8_query = utils::wide_string_to_string(utf16_query_json);
-        filter = bson_new_from_json((const uint8_t*)utf8_query.c_str(), utf8_query.size(), &error);
+        // Query the collection
         mongoc_cursor_t* cursor = mongoc_collection_find_with_opts(c, filter, opts, NULL);
-        
-        while (mongoc_cursor_next(cursor, (const bson_t**)&doc)) {
+        const bson_t* doc = NULL;
 
-            //if we have a top level field filter, attempt to parse it from bso
-            if (strcmp(s_toplevelfield.c_str(), "") != 0) {
+        // Iterate over cursor results
+        if (mongoc_cursor_next(cursor, &doc)) {
+            if (!s_selector.empty()) {
+                // If a selector is specified, search within the document
                 bson_iter_t iter;
-                if (bson_iter_init(&iter, doc)) {
-                    if (bson_iter_find(&iter, s_toplevelfield.c_str())) {
-                        wchar_t* to_return = bsonparser::convert_bson_iter_value(&iter);
-                        bson_destroy(doc);
-                        return to_return;
-                    }
+                if (bson_iter_init(&iter, doc) && bson_iter_find_descendant(&iter, s_selector.c_str(), &iter)) {
+                    wchar_t* result = bsonparser::convert_bson_iter_value(&iter);
+
+                    // Cleanup and return
+                    mongoc_cursor_destroy(cursor);
+                    bson_destroy(filter);
+                    bson_destroy(opts);
+                    return result;
                 }
             }
-            //else we just return what we got
+
+            // If no selector or selector not found, return the entire document
             char* charptr = bson_as_canonical_extended_json(doc, NULL);
             std::string str(charptr);
-            wchar_t * result = utils::string_to_wide_string(str);
+            wchar_t* result = utils::string_to_wide_string(str);
+
+            // Cleanup and return
             bson_free(charptr);
             mongoc_cursor_destroy(cursor);
+            bson_destroy(filter);
+            bson_destroy(opts);
             return result;
         }
 
+        // Handle cursor errors
         if (mongoc_cursor_error(cursor, &error)) {
             MONGOC_ERROR("mongoc_collection_find_with_opts Error: %s\n", error.message);
             utils::bsonErrtoStruct(error, err);
-            return 0;
         }
-        //if no result found, return empty result
-        utils::charErrtoStruct(47, "NoMatchingDocument", err);
+        else {
+            utils::charErrtoStruct(47, "NoMatchingDocument", err);
+        }
+
+        // Cleanup on no result or error
         mongoc_cursor_destroy(cursor);
         bson_destroy(filter);
-        bson_destroy(doc);
-        return 0;
+        bson_destroy(opts);
+        return NULL;
     }
 
-    wchar_t* _UpdateOne(mongoc_collection_t* c, wchar_t* utf_16_selector, wchar_t* utf_16_update, wchar_t* utf_16_options, struct ErrorStruct* err)
-    {
+
+    wchar_t* _UpdateOne(mongoc_collection_t* c, wchar_t* utf_16_selector, wchar_t* utf_16_update, wchar_t* utf_16_options, struct ErrorStruct* err) {
         bson_error_t error;
 
+        // Validate inputs
         if (!utils::is_valid_wstring(utf_16_selector)) {
-            utils::charErrtoStruct(1, "update failed because update was not a valid value", err);
-            MONGOC_ERROR("update failed because selector was not a valid value\n");
+            utils::charErrtoStruct(1, "Update failed: Selector is not a valid value.", err);
+            MONGOC_ERROR("Update failed: Selector is not a valid value.\n");
             return NULL;
         }
         if (!utils::is_valid_wstring(utf_16_update)) {
-            utils::charErrtoStruct(1, "update failed because update was not a valid value", err);
-            MONGOC_ERROR("update failed because update was not a valid value");
+            utils::charErrtoStruct(1, "Update failed: Update document is not a valid value.", err);
+            MONGOC_ERROR("Update failed: Update document is not a valid value.\n");
             return NULL;
         }
         if (!utils::is_valid_wstring(utf_16_options)) {
-            utf_16_options = (wchar_t*)L"{}";
+            utf_16_options = (wchar_t*)L"{}";  // Default to an empty options document
         }
 
-        bson_t* selector    = utils::wchar_to_bson_t(utf_16_selector);
-        bson_t* update      = utils::wchar_to_bson_t(utf_16_update);
-        bson_t* opts        = utils::wchar_to_bson_t(utf_16_options);
-        bson_t* reply       = bson_new();
+        // Convert input strings to BSON
+        bson_t* selector = utils::wchar_to_bson_t(utf_16_selector);
+        bson_t* update = utils::wchar_to_bson_t(utf_16_update);
+        bson_t* opts = utils::wchar_to_bson_t(utf_16_options);
+        bson_t* reply = bson_new();
 
-        if (!mongoc_collection_update_one(c, selector, update, opts, reply, &error)) {
-            utils::bsonErrtoStruct(error, err); 
-            MONGOC_ERROR("update failed: %s\n", error.message);
+        if (!selector || !update || !opts) {
+            utils::charErrtoStruct(1, "Failed to parse BSON from input strings.", err);
+            MONGOC_ERROR("Failed to parse BSON from input strings.\n");
+            bson_destroy(selector);
+            bson_destroy(update);
+            bson_destroy(opts);
+            bson_destroy(reply);
             return NULL;
         }
-        return utils::bson_t_to_wchar_t(reply);
+
+        // Perform the update
+        if (!mongoc_collection_update_one(c, selector, update, opts, reply, &error)) {
+            utils::bsonErrtoStruct(error, err);
+            MONGOC_ERROR("Update failed: %s\n", error.message);
+            bson_destroy(selector);
+            bson_destroy(update);
+            bson_destroy(opts);
+            bson_destroy(reply);
+            return NULL;
+        }
+
+        // Convert reply to wchar_t* and clean up
+        wchar_t* result = utils::bson_t_to_wchar_t(reply);
+
+        bson_destroy(selector);
+        bson_destroy(update);
+        bson_destroy(opts);
+        bson_destroy(reply);
+
+        return result;
     }
 
-    int _DeleteOne(mongoc_collection_t* c, wchar_t* utf_16_selector, struct ErrorStruct* err)
+    bool _DeleteOne(mongoc_collection_t* c, wchar_t* utf_16_selector, struct ErrorStruct* err)
     {
         bson_error_t error;
 
         if (!utils::is_valid_wstring(utf_16_selector)) {
             utils::charErrtoStruct(1, "delete failed because selector was not a valid value", err);
             MONGOC_ERROR("delete failed because selector was not a valid value");
-            return 0;
+            return false;
         }
 
         bson_t* selector = utils::wchar_to_bson_t(utf_16_selector);
         if (!mongoc_collection_remove(c, MONGOC_REMOVE_SINGLE_REMOVE, selector, NULL, &error)) {
             MONGOC_ERROR("Delete failed: %s\n", error.message);
             utils::bsonErrtoStruct(error, err);
-            return 0;
+            bson_destroy(selector);
+            return false;
         }
         if (error.code) {
             MONGOC_ERROR("bson_new_from_json error: %s\n", error.message);
             utils::bsonErrtoStruct(error, err);
-            return 0;
+            bson_destroy(selector);
+            return false;
         }
-        return 1;
+        bson_destroy(selector);
+        return true;
     }
 
-    mongoc_cursor_t* _FindMany(mongoc_collection_t* c, wchar_t* utf16_query_json, wchar_t* utf_16_options, struct ErrorStruct* err)
-    {
-        /* returns cursor, caller needs to destroy it */
-        bson_t* filter;
+    mongoc_cursor_t* _FindMany(mongoc_collection_t* c, wchar_t* utf16_query_json, wchar_t* utf_16_options, struct ErrorStruct* err) {
+        /* Returns cursor, caller needs to destroy it */
+        bson_t* filter = NULL;
+        bson_t* opts = NULL;
         bson_error_t error;
 
+        // Validate options string and set default if invalid
         if (!utils::is_valid_wstring(utf_16_options)) {
             utf_16_options = (wchar_t*)L"{}";
         }
 
-        bson_t* opts = utils::wchar_to_bson_t(utf_16_options);
+        // Convert options and query to BSON
+        opts = utils::wchar_to_bson_t(utf_16_options);
         std::string utf8_query = utils::wide_string_to_string(utf16_query_json);
         filter = bson_new_from_json((const uint8_t*)utf8_query.c_str(), utf8_query.size(), &error);
 
         if (error.code) {
             MONGOC_ERROR("_FindMany error: %s\n", error.message);
             utils::bsonErrtoStruct(error, err);
+            bson_destroy(opts);
             return NULL;
         }
 
+        // Perform the query and return the cursor
         mongoc_cursor_t* results = mongoc_collection_find_with_opts(c, filter, opts, NULL);
+
+        bson_destroy(filter);
+        bson_destroy(opts);
+
         return results;
     }
 
@@ -592,39 +680,36 @@ namespace impl {
     }
 
     wchar_t* _ClientCommandSimple(mongoc_collection_t* c, wchar_t* utf_16_command, wchar_t* database, struct ErrorStruct* err) {
-        //https://www.mongodb.com/docs/manual/reference/command/
         if (!utils::is_valid_wstring(utf_16_command)) {
             MONGOC_ERROR("Invalid parameter \"command\"\n");
             return NULL;
         }
-        
+
         bson_t* command = utils::wchar_to_bson_t(utf_16_command);
         bson_t* reply = bson_new();
         bson_error_t error;
+
+        // Determine the database to use, defaulting to the collection's database
         std::string s_db(c->db);
         if (database != nullptr && wcslen(database) != 0) {
             s_db = utils::wide_string_to_string(database);
         }
-        //if the command is successful, error is not initialized so we must use if else as seen in mongo tutorials executing.c example code
-        if (mongoc_client_command_simple(c->client,
-                                    s_db.c_str(),
-                                    command,
-                                    NULL,//const mongoc_read_prefs_t * read_prefs,
-                                    reply,
-                                    &error)){
+
+        if (mongoc_client_command_simple(c->client, s_db.c_str(), command, NULL, reply, &error)) {
             char* charptr = bson_as_canonical_extended_json(reply, NULL);
             std::string str(charptr);
             wchar_t* result = utils::string_to_wide_string(str);
             bson_free(charptr);
-            bson_free(reply);
+            bson_destroy(reply);
+
             return result;
         }
         else {
             MONGOC_ERROR("mongoc_client_command_simple error: %s\n", error.message);
-            utils::bsonErrtoStruct(error, err); //ensure error is set
+            utils::bsonErrtoStruct(error, err);
+            bson_destroy(reply);
             return NULL;
         }
-
     }
 
     void* _CursorDestroy(mongoc_cursor_t* cursor)
@@ -655,13 +740,13 @@ namespace impl {
         const char* message,
         void* user_data)
     {
-        //error callback from mongoc, only used when _setLogHandler was called.
+        // Error callback from mongoc, only used when _setLogHandler was called.
 
-        if (!currentLogPath.size()) {
+        if (currentLogPath.empty()) {
             return;
         }
 
-        //get current time
+        // Get the current time
         char buff[100];
         time_t now = time(0);
         struct tm sTm;
@@ -672,22 +757,15 @@ namespace impl {
             snprintf(buff, sizeof(buff), "unknown time");
         }
 
-        //print to log file
+        // Open log file in append mode
         FILE* logFile = nullptr;
         errno_t err = fopen_s(&logFile, currentLogPath.c_str(), "a");
-        //todo: find out why fopen_S always returns 183 when file exists (which it usually does)
-        if (GetLastError() == 183) { 
-            SetLastError(0); //ignore error
-        }
         if (err != 0 || logFile == nullptr) {
-            MONGOC_ERROR(
-                "Error opening logfile [%s]", currentLogPath.c_str());
+            MONGOC_ERROR("Error opening logfile [%s]", currentLogPath.c_str());
             return;
         }
 
-        //log to file formatted
-        bool endsWithNewline = message[strlen(message) - 1] == '\n';
-
+        bool endsWithNewline = (message[strlen(message) - 1] == '\n');
         if (endsWithNewline) {
             fprintf(logFile, "%s\t%s\t%s\t%s", buff, log_domain, getLogLevelStr(log_level), message);
         }
@@ -698,7 +776,7 @@ namespace impl {
         fclose(logFile);
     }
 
-    void _setLogHandler(wchar_t* filePath, struct ErrorStruct* err) {
+    void _setLogFile(wchar_t* filePath, struct ErrorStruct* err) {
         if (!utils::is_valid_wstring(filePath)) {
             MONGOC_ERROR(
                 "Cannot set LogHandler, determined invalid FilePath Pointer.");
@@ -708,13 +786,11 @@ namespace impl {
 
         currentLogPath = utils::wide_string_to_string(filePath);
         mongoc_log_set_handler(logHandler, NULL);
+        
         MONGOC_INFO(
             "Log Initialized [%s]", currentLogPath.c_str());
-        mongoc_log_trace_enable();
+        
     }
-
-
-
 }
 
 //

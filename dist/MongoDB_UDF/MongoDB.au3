@@ -21,16 +21,21 @@ Opt("MustDeclareVars", 1)
 ;~ _Mongo_CreateCollection($sMongoconnection, $sMongoDatabaseName, $sMongoCollectionName)
 ;~ _Mongo_InsertOne($pMongocollection, Const ByRef $sJson)
 ;~ _Mongo_InsertMany($pMongocollection, Const ByRef $sJson)
-;~ _Mongo_FindOne($pMongocollection, $sQuery, $sProjection = "{}")
 ;~ _Mongo_UpdateOne($pMongocollection, $sQuery, $sUpdate, $sOptions = "{}")
+;~ _Mongo_CountDocs($pMongocollection, $sQuery, $sOpts = "{}")
+;~ _Mongo_FindOne($pMongocollection, $sQuery, $sProjection = "{}", $sSelector = "")
 ;~ _Mongo_DeleteOne($pMongocollection, $sQuery)
-;~ _Mongo_Coll_Aggregate($pMongocollection, $sPipeline, $sOpts = "{}")
 ;~ _Mongo_FindMany($pMongocollection, $sQuery, $sOpts = "{}")
-;~ _Mongo_CursorNext($pCursor, ByRef $sNext)
+;~ _Mongo_Coll_Aggregate($pMongocollection, $sPipeline, $sOpts = "{}")
+;~ _Mongo_CursorNext($pCursor, ByRef $sNext,  $sSelector = "")
+;~ _Mongo_Cursor_To_Array($pCursor,$sSelector = "")
 ;~ _Mongo_CursorDestroy($ptr_cursor)
-;~ _Mongo_ClientCommandSimple($pMongocollection, ByRef $sCmd)
+;~ _Mongo_ClientCommandSimple($pMongocollection, $sCmd, $sDatabase = "")
+;~ _Mongo_GetJsonVal($sJson, $sSelector, $sDefault = "")
+;~ _Mongo_AppendJsonKV($sJson, $sK, $sV="", $selector="")
+;~ _Mongo_JsonAppendSubJson($sJson, $sK, $sV='{"key":"value"}', $selector="" )
 
-
+#Region mongodb.au3 - Functions
 ; #FUNCTION# ====================================================================================================================
 ; Name...........: _Mongo_Init
 ; Description ...: Mandatory, Loads the Dlls 
@@ -60,7 +65,6 @@ Func _Mongo_Init($sInstallDir = @ScriptDir & "\include\MongoDB_UDF\")
 	EndIf
 EndFunc
 
-#Region mongodb.au3 - Functions
 
 ; #FUNCTION# ====================================================================================================================
 ; Name...........: _Mongo_SetLogFile
@@ -127,7 +131,7 @@ EndFunc
 ; Syntax.........: _Mongo_InsertOne($pMongocollection, $sJson)
 ; Parameters ....: $pMongocollection   		- from CreateCollection
 ;                  $sJson        			- valid JSON str, the document to be inserted
-; Return values .: Mongodb Error Code, 0 if success
+; Return values .: Bool
 ; Author ........: emcodem
 ; Modified.......:
 ; Remarks .......:
@@ -140,7 +144,7 @@ Func _Mongo_InsertOne($pMongocollection, Const ByRef $sJson)
 	Local $tErr  	= __Mongo_MakeErrStruct()
 	Local $pErr 	= DllStructGetPtr($tErr)
 
-	Local $aResult 	= DllCall($__hMongo_1_29_1, "int:cdecl", "InsertOne", "ptr", $pMongocollection, "ptr",$pJson, "ptr", $pErr)
+	Local $aResult 	= DllCall($__hMongo_1_29_1, "BOOLEAN", "InsertOne", "ptr", $pMongocollection, "ptr",$pJson, "ptr", $pErr)
 	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : $aResult[0]
 EndFunc
 
@@ -197,62 +201,6 @@ Func _Mongo_UpdateOne($pMongocollection, $sQuery, $sUpdate, $sOptions = "{}")
 EndFunc
 
 ; #FUNCTION# ====================================================================================================================
-; Name...........: _Mongo_FindOne
-; Description ...: Find a single document
-; Syntax.........: _Mongo_FindOne($pMongocollection, $sQuery, $sProjection = "{}")
-; Parameters ....: $pMongocollection	   	- from CreateCollection
-;                  $sQuery					- valid JSON str, mongodb query
-;                  $sProjection				- valid JSON str, which fields to return
-;				   $sTopLevelField			- str, this is not part of mongo but our own invention, forces return content of this top level field
-
-
-; Return values .: JSON String, the document found or {}
-; Author ........: emcodem
-; Modified.......:
-; Remarks .......: Sets @Error code 47 (NoMatchingDocument) if none found
-; Link ..........: https://www.mongodb.com/docs/manual/reference/method/db.collection.findOne/
-; Example .......: Yes
-; ===============================================================================================================================
-Func _Mongo_FindOne($pMongocollection, $sQuery, $sProjection = "{}", $sTopLevelField = "")
-	Local $t1,$t2,$t3
-	Local $pQuery 		= __Mongo_MakeWstrPtr($sQuery,$t1)
-	Local $pProjection	= __Mongo_MakeWstrPtr($sProjection,$t2)
-	Local $pTlf			= __Mongo_MakeWstrPtr($sTopLevelField,$t3)
-	Local $tErr  		= __Mongo_MakeErrStruct()
-	Local $pErr 		= DllStructGetPtr($tErr)
-	Local $aResult 		= DllCall($__hMongo_1_29_1, "WSTR", "FindOne", "ptr", $pMongocollection, "ptr", $pQuery, "ptr", $pProjection, "ptr", $pTlf, "ptr", $pErr )
-	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : $aResult[0]
-EndFunc
-
-
-; #FUNCTION# ====================================================================================================================
-; Name...........: _Mongo_Coll_Aggregate
-; Description ...: Executes an Aggregation Pipeline
-; Syntax.........: _Mongo_Coll_Aggregate($pMongocollection, $sPipeline, $sOpts = "{}")
-; Parameters ....: $pMongocollection	   	- from CreateCollection
-;                  $sPipelinee				- valid JSON str, mongodb Aggregation Pipeline JSON
-;                  $sOpts					- optional, valid JSON str, see docs (example sort, skip)
-; Return values .: Pointer to mongoc_cursor_t
-; Author ........: emcodem
-; Modified.......:
-; Remarks .......: Use CursorNext to iterate through the documents, use CursorDestory when you are done to free the memory
-; Related .......: CursorNext, CursorDestroy
-; Link ..........: https://mongoc.org/libmongoc/current/mongoc_collection_aggregate.html
-;				   https://www.mongodb.com/docs/manual/core/aggregation-pipeline/
-; Example .......: Yes
-; ===============================================================================================================================
-Func _Mongo_Coll_Aggregate($pMongocollection, $sPipeline, $sOpts = "{}")
-	Local $t1,$t2
-	Local $pPipeline	= __Mongo_MakeWstrPtr($sPipeline,$t1)
-	Local $pOpts 		= __Mongo_MakeWstrPtr($sOpts,$t2)
-	Local $tErr  		= __Mongo_MakeErrStruct()
-	Local $pErr 		= DllStructGetPtr($tErr)
-	Local $aResult 		= DllCall($__hMongo_1_29_1, "ptr", "Collection_Aggregate", "ptr", $pMongocollection, "ptr", $pPipeline, "ptr", $pOpts, "ptr", $pErr);
-	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : $aResult[0]
-EndFunc
-
-
-; #FUNCTION# ====================================================================================================================
 ; Name...........: _Mongo_CountDocs
 ; Description ...: Counts docs by query
 ; Syntax.........: _Mongo_CountDocs($pMongocollection, $sQuery, $sOpts)
@@ -274,7 +222,56 @@ Func _Mongo_CountDocs($pMongocollection, $sQuery, $sOpts = "{}")
 	Local $pErr 	= DllStructGetPtr($tErr)
 
 	Local $aResult 	= DllCall($__hMongo_1_29_1, "INT64:cdecl", "CountDocuments", "ptr", $pMongocollection, "ptr", $pQuery, "ptr", $pOpts, "ptr", $pErr)
+	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : $aResult[0]
+EndFunc
+
+; #FUNCTION# ====================================================================================================================
+; Name...........: _Mongo_FindOne
+; Description ...: Find a single document
+; Syntax.........: _Mongo_FindOne($pMongocollection, $sQuery, $sProjection = "{}")
+; Parameters ....: $pMongocollection	   	- from CreateCollection
+;                  $sQuery					- valid JSON str, mongodb query
+;                  $sProjection				- valid JSON str, which fields to return
+;				   $sSelector				- dot notated accessor for returning subresults, see sSelector@Cursornext
+; Return values .: String
+; Author ........: emcodem
+; Modified.......:
+; Remarks .......: Sets @Error code 47 (NoMatchingDocument) if none found
+; Link ..........: https://www.mongodb.com/docs/manual/reference/method/db.collection.findOne/
+; Example .......: Yes
+; ===============================================================================================================================
+Func _Mongo_FindOne($pMongocollection, $sQuery, $sProjection = "{}", $sSelector = "")
+	Local $t1,$t2,$t3
+	Local $pQuery 		= __Mongo_MakeWstrPtr($sQuery,$t1)
+	Local $pProj		= __Mongo_MakeWstrPtr($sProjection,$t2)
+	Local $pSel			= __Mongo_MakeWstrPtr($sSelector,$t3)
+	Local $tErr  		= __Mongo_MakeErrStruct()
+	Local $pErr 		= DllStructGetPtr($tErr)
+	Local $aResult 		= DllCall($__hMongo_1_29_1, "WSTR", "FindOne", "ptr", $pMongocollection, "ptr", $pQuery, "ptr", $pProj, "ptr", $pSel, "ptr", $pErr )
+	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : $aResult[0]
+EndFunc
+
+; #FUNCTION# ====================================================================================================================
+; Name...........: _Mongo_DeleteOne
+; Description ...: Find a single document
+; Syntax.........: _Mongo_DeleteOne($pMongocollection, $search, $update, $options)
+; Parameters ....: $pMongocollection	   	- from CreateCollection
+;                  $sQuery					- valid JSON str, mongodb query
+;                  $sProjection				- valid JSON str, which fields to return
+; Return values .: Bool
+; Author ........: emcodem
+; Modified.......:
+; Remarks .......:
+; Link ..........: https://www.mongodb.com/docs/manual/reference/method/db.collection.deleteOne/
+; Example .......: Yes
+; ===============================================================================================================================
+Func _Mongo_DeleteOne($pMongocollection, $sQuery)
+	Local $t1;
+	Local $pQuery 		= __Mongo_MakeWstrPtr($sQuery,$t1)
+	Local $tErr  		= __Mongo_MakeErrStruct()
+	Local $pErr 		= DllStructGetPtr($tErr)
 	
+	Local $aResult 		= DllCall($__hMongo_1_29_1, "BOOLEAN", "DeleteOne", "ptr", $pMongocollection, "ptr", $pQuery, "ptr", $pErr)
 	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : $aResult[0]
 EndFunc
 
@@ -303,6 +300,31 @@ Func _Mongo_FindMany($pMongocollection, $sQuery, $sOpts = "{}")
 	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : $aResult[0]
 EndFunc
 
+; #FUNCTION# ====================================================================================================================
+; Name...........: _Mongo_Coll_Aggregate
+; Description ...: Executes an Aggregation Pipeline
+; Syntax.........: _Mongo_Coll_Aggregate($pMongocollection, $sPipeline, $sOpts = "{}")
+; Parameters ....: $pMongocollection	   	- from CreateCollection
+;                  $sPipelinee				- valid JSON str, mongodb Aggregation Pipeline JSON
+;                  $sOpts					- optional, valid JSON str, see docs (example sort, skip)
+; Return values .: Pointer to mongoc_cursor_t
+; Author ........: emcodem
+; Modified.......:
+; Remarks .......: Use CursorNext to iterate through the documents, use CursorDestory when you are done to free the memory
+; Related .......: CursorNext, CursorDestroy
+; Link ..........: https://mongoc.org/libmongoc/current/mongoc_collection_aggregate.html
+;				   https://www.mongodb.com/docs/manual/core/aggregation-pipeline/
+; Example .......: Yes
+; ===============================================================================================================================
+Func _Mongo_Coll_Aggregate($pMongocollection, $sPipeline, $sOpts = "{}")
+	Local $t1,$t2
+	Local $pPipeline	= __Mongo_MakeWstrPtr($sPipeline,$t1)
+	Local $pOpts 		= __Mongo_MakeWstrPtr($sOpts,$t2)
+	Local $tErr  		= __Mongo_MakeErrStruct()
+	Local $pErr 		= DllStructGetPtr($tErr)
+	Local $aResult 		= DllCall($__hMongo_1_29_1, "ptr", "Collection_Aggregate", "ptr", $pMongocollection, "ptr", $pPipeline, "ptr", $pOpts, "ptr", $pErr);
+	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : $aResult[0]
+EndFunc
 
 ; #FUNCTION# ====================================================================================================================
 ; Name...........: _Mongo_CursorNext
@@ -365,7 +387,7 @@ EndFunc
 Func _Mongo_Cursor_To_Array($pCursor,$sSelector = "")
 	Local $sNext
 	Local $aArray [0]
-	While (_Mongo_CursorNext($pCursor,$sNext,"full"))
+	While (_Mongo_CursorNext($pCursor,$sNext,$sSelector))
 		If (@error) And ( @error <> 47) Then
 			ConsoleWrite("_Mongo_Cursor_To_Array error " & @error & @CRLF)
 			return SetError(@error)
@@ -376,30 +398,6 @@ Func _Mongo_Cursor_To_Array($pCursor,$sSelector = "")
 	WEnd
 	_Mongo_CursorDestroy($pCursor)
 	return $aArray
-EndFunc
-
-; #FUNCTION# ====================================================================================================================
-; Name...........: _Mongo_DeleteOne
-; Description ...: Find a single document
-; Syntax.........: _Mongo_DeleteOne($pMongocollection, $search, $update, $options)
-; Parameters ....: $pMongocollection	   	- from CreateCollection
-;                  $sQuery					- valid JSON str, mongodb query
-;                  $sProjection				- valid JSON str, which fields to return
-; Return values .: JSON String, the document found or {}
-; Author ........: emcodem
-; Modified.......:
-; Remarks .......:
-; Link ..........: https://www.mongodb.com/docs/manual/reference/method/db.collection.deleteOne/
-; Example .......: Yes
-; ===============================================================================================================================
-Func _Mongo_DeleteOne($pMongocollection, $sQuery)
-	;~returns 1 if 1 document was deleted, otherwise 0
-	Local $t1;
-	Local $pQuery 		= __Mongo_MakeWstrPtr($sQuery,$t1)
-	Local $tErr  		= __Mongo_MakeErrStruct()
-	Local $pErr 		= DllStructGetPtr($tErr)
-	Local $aResult 		= DllCall($__hMongo_1_29_1, "int", "DeleteOne", "ptr", $pMongocollection, "ptr", $pQuery, "ptr", $pErr)
-	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : $aResult[0]
 EndFunc
 
 ; #FUNCTION# ====================================================================================================================
@@ -451,14 +449,14 @@ EndFunc
 
 #EndRegion mongodb.au3 - Functions
 
-#Region JSON/BSON Functions
+#Region JSON Functions
 
 ; #FUNCTION# ====================================================================================================================
 ; Name...........: _Mongo_GetJsonVal
 ; Description ...: Convenience function to access values of json str using dot notation key.subkey.0.finalkey
 ; Syntax.........: _Mongo_GetJsonVal($sJson, "key.subkey", "defaultval")
 ; Parameters ....: $sJson   		- valid JSON str
-;                  $sSelector			- dot notated selector, e.g. key.subkey.0.finalkey
+;                  $sSelector		- dot notated selector, e.g. key.subkey.0.finalkey
 ; Return values .: String or JSON string or Array String translated as good as possible from original DB Type
 ; Author ........: emcodem
 ; Modified.......:
@@ -479,46 +477,10 @@ Func _Mongo_GetJsonVal($sJson, $sSelector, $sDefault = "")
 	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : $aResult[0]
 EndFunc
 
-Func _Mongo_AppendJsonKV($sJson, $sK, $sV="", $selector="")
-	Local $t1,$t2,$t3,$t4
-	Local $pJson	= __Mongo_MakeWstrPtr($sJson,$t1)
-	Local $pK 		= __Mongo_MakeWstrPtr($sK,$t2)
-	Local $pV 		= __Mongo_MakeWstrPtr($sV,$t3)
-	Local $pS 		= __Mongo_MakeWstrPtr($selector,$t4)
-	Local $aResult 	= DllCall($__hMongo_1_29_1, "WSTR", "JsonAppendValue","ptr", $pJson, "ptr", $pK, "ptr", $pV, "ptr", $pS);
-	return $aResult[0]
-EndFunc
-
-Func _Mongo_JsonAppendSubJson($sJson, $sK, $sV='{"key":"value"}', $selector="" )
-	Local $t1,$t2,$t3,$t4
-	Local $pJson	= __Mongo_MakeWstrPtr($sJson,$t1)
-	Local $pK 		= __Mongo_MakeWstrPtr($sK,$t2)
-	Local $pV 		= __Mongo_MakeWstrPtr($sV,$t3)
-	Local $pS 		= __Mongo_MakeWstrPtr($selector,$t4)
-	Local $aResult 	= DllCall($__hMongo_1_29_1, "WSTR", "JsonAppendSubJson","ptr", $pJson, "ptr", $pK, "ptr", $pV, "ptr", $pS);
-	return $aResult[0]
-EndFunc
-
-Func _bson_new_from_json($s)
-	Local $t1
-	Local $pJson	= __Mongo_MakeWstrPtr($s,$t1)
-	Local $aResult 	= DllCall($__hMongo_1_29_1, "PTR", "_bson_new_from_json","ptr", $pJson);
-	return $aResult[0]
-EndFunc
-
-Func _bson_as_canonical_extended_json($p)
-	Local $aResult 	= DllCall($__hMongo_1_29_1, "WSTR", "_bson_as_canonical_extended_json","ptr", $p);
-	return $aResult[0]
-EndFunc
-
-Func _bson_destroy($p)
-	Local $aResult 	= DllCall($__hMongo_1_29_1, "PTR", "_bson_destroy","ptr", $p);
-	return $aResult[0]
-EndFunc
-
 #EndRegion
 
 #Region mongodb.au3 - Functions - MISC
+
 ; #INTERNAL_USE_ONLY# ===========================================================================================================
 ; Name...........: __Mongo_MakeWstrPtr
 ; Description ...: string to wchar_t pointer (keeps utf-16 encoding)
@@ -552,3 +514,44 @@ Func __Mongo_MakeErrStruct()
 	return $tErrStruct
 EndFunc
 #EndRegion mongodb.au3 - Functions - MISC
+
+#Region Experimental functions DO NOT USE
+
+Func _bson_new_from_json($s)
+	Local $t1
+	Local $pJson	= __Mongo_MakeWstrPtr($s,$t1)
+	Local $aResult 	= DllCall($__hMongo_1_29_1, "PTR", "_bson_new_from_json","ptr", $pJson);
+	return $aResult[0]
+EndFunc
+
+Func _bson_as_canonical_extended_json($p)
+	Local $aResult 	= DllCall($__hMongo_1_29_1, "WSTR", "_bson_as_canonical_extended_json","ptr", $p);
+	return $aResult[0]
+EndFunc
+
+Func _bson_destroy($p)
+	Local $aResult 	= DllCall($__hMongo_1_29_1, "PTR", "_bson_destroy","ptr", $p);
+	return $aResult[0]
+EndFunc
+
+Func _Mongo_AppendJsonKV($sJson, $sK, $sV, $selector="")
+	Local $t1,$t2,$t3,$t4
+	Local $pJson	= __Mongo_MakeWstrPtr($sJson,$t1)
+	Local $pK 		= __Mongo_MakeWstrPtr($sK,$t2)
+	Local $pV 		= __Mongo_MakeWstrPtr($sV,$t3)
+	Local $pS 		= __Mongo_MakeWstrPtr($selector,$t4)
+	Local $aResult 	= DllCall($__hMongo_1_29_1, "WSTR", "JsonAppendValue","ptr", $pJson, "ptr", $pK, "ptr", $pV, "ptr", $pS);
+	return $aResult[0]
+EndFunc
+
+Func _Mongo_JsonAppendSubJson($sJson, $sK, $sSubDoc, $selector="" )
+	Local $t1,$t2,$t3,$t4
+	Local $pJson	= __Mongo_MakeWstrPtr($sJson,$t1)
+	Local $pK 		= __Mongo_MakeWstrPtr($sK,$t2)
+	Local $pV 		= __Mongo_MakeWstrPtr($sSubDoc,$t3)
+	Local $pS 		= __Mongo_MakeWstrPtr($selector,$t4)
+	Local $aResult 	= DllCall($__hMongo_1_29_1, "WSTR", "JsonAppendSubJson","ptr", $pJson, "ptr", $pK, "ptr", $pV, "ptr", $pS);
+	return $aResult[0]
+EndFunc
+
+#EndRegion Experimental functions

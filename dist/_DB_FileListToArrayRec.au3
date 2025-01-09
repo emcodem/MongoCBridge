@@ -1,10 +1,11 @@
 
 #include <Array.au3>
-#include "MongoDB_UDF\MongoDB_Test.au3"
+
 #include "MongoDB_UDF\MongoDB.au3"
 #include "MongoDB_UDF\MongoDB_SimpleJson.au3"
 
-_Mongo_Init(@ScriptDir & "\MongoDB_UDF")
+_Mongo_Init(@ScriptDir & "\MongoDB_UDF\")
+
 Local $s_mongo_url 		= "mongodb://localhost:27017"
 Local $s_mongo_database_name 	= "ffastrans"
 Local $s_mongo_collection_name 	= "configs"
@@ -46,6 +47,7 @@ Func _DB_FileListToArrayRec($pDB, $sFilePath , $sMask = "*" , $iReturn = 1 , $iR
     EndIf
     $s_dirrgx = _DB_FLTAR_RegexEscape($s_dirrgx)
 
+    ;Construct query
     Local $query = '{'
     $query &= '"dir": { "$regex": "' & _JSafe($s_dirrgx) & '", "$options": "i" }'
     $query &= ',"name": { "$regex": "' & _JSafe($sInc) & '", "$options": "i" }'
@@ -62,6 +64,7 @@ Func _DB_FileListToArrayRec($pDB, $sFilePath , $sMask = "*" , $iReturn = 1 , $iR
         $sOpts = '{"sort": {"name":1}}'
     EndIf
 
+    ;Exec query
     ConsoleWrite("QUERY " & $query & @CRLF)
     MsgBox(0,0,0)
     Local $cnt =  _Mongo_CountDocs($pDB,$query)
@@ -71,7 +74,7 @@ Func _DB_FileListToArrayRec($pDB, $sFilePath , $sMask = "*" , $iReturn = 1 , $iR
         Exit(300)
     EndIf
     
-    Local $aCursor = _Mongo_Cursor_To_Array($pCursor)
+    Local $aCursor = _Mongo_Cursor_To_Array($pCursor,"full")
     If (@error) Then
         Exit(400)
     EndIf

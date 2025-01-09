@@ -14,11 +14,11 @@ extern "C"
     DECLDIR void*       CursorDestroy(mongoc_cursor_t* cursor);
 
     DECLDIR mongoc_collection_t* CreateCollection(wchar_t* utf16_conn_str, wchar_t* db_name, wchar_t* collection_name, struct ErrorStruct* err);
-    DECLDIR int         InsertOne(mongoc_collection_t* c, wchar_t* utf16String, struct ErrorStruct* err);
+    DECLDIR bool        InsertOne(mongoc_collection_t* c, wchar_t* utf16String, struct ErrorStruct* err);
     DECLDIR bool        InsertMany(mongoc_collection_t* c, wchar_t* utf16ArrayOfJsons, struct ErrorStruct* err);
     DECLDIR wchar_t*    FindOne(mongoc_collection_t* c, wchar_t* query, wchar_t* utf_16_options, wchar_t* top_level_field, struct ErrorStruct* err);
     DECLDIR wchar_t*    UpdateOne(mongoc_collection_t* c, wchar_t* utf16_search, wchar_t* utf16_update, wchar_t* utf16_options, struct ErrorStruct* err);
-    DECLDIR int         DeleteOne(mongoc_collection_t* c, wchar_t* utf16_search, struct ErrorStruct* err);
+    DECLDIR bool        DeleteOne(mongoc_collection_t* c, wchar_t* utf16_search, struct ErrorStruct* err);
     DECLDIR mongoc_cursor_t* FindMany(mongoc_collection_t* c, wchar_t* utf16_query_json, wchar_t* utf_16_options, struct ErrorStruct* err);
     DECLDIR mongoc_cursor_t* Collection_Aggregate(mongoc_collection_t* c, wchar_t* pipeline, wchar_t* opts, struct ErrorStruct* err);
     DECLDIR int64_t         CountDocuments(mongoc_collection_t* c, wchar_t* utf16query, wchar_t* utf16opts, struct ErrorStruct* err);
@@ -55,16 +55,16 @@ namespace impl {
     // Implementation
     // todo: this is stupid, above functions should take care about validating and translating the params and these funcs should take only mongo compatible params
     // this way we could also offer overloaded versions e.g. where the caller already has a ready to use bson_t* isntead of wchar
-    void        _setLogHandler(wchar_t* filePath, struct ErrorStruct* err);
+    void        _setLogFile(wchar_t* filePath, struct ErrorStruct* err);
     void        _CloseCollection(mongoc_collection_t* c);
     void*       _CursorDestroy(mongoc_cursor_t* cursor);
 
     mongoc_collection_t* _CreateCollection(wchar_t* utf16_conn_str, wchar_t* db_name, wchar_t* collection_name, struct ErrorStruct* err);
-    int         _InsertOne(mongoc_collection_t* c, wchar_t* utf16String, struct ErrorStruct* err);
+    bool         _InsertOne(mongoc_collection_t* c, wchar_t* utf16String, struct ErrorStruct* err);
     bool        _InsertMany(mongoc_collection_t* c, wchar_t* utf16Doc, struct ErrorStruct* err);
     wchar_t*    _FindOne(mongoc_collection_t* c, wchar_t* query, wchar_t* utf_16_options, wchar_t* top_level_field, struct ErrorStruct* err);
     wchar_t*    _UpdateOne(mongoc_collection_t* c, wchar_t* query, wchar_t* payload, wchar_t* utf16_options, struct ErrorStruct* err);
-    int         _DeleteOne(mongoc_collection_t* c, wchar_t* query, struct ErrorStruct* err);
+    bool         _DeleteOne(mongoc_collection_t* c, wchar_t* query, struct ErrorStruct* err);
     mongoc_cursor_t* _FindMany(mongoc_collection_t* c, wchar_t* utf16_query_json, wchar_t* utf_16_options, struct ErrorStruct* err);
     mongoc_cursor_t* _Collection_Aggregate(mongoc_collection_t* c, wchar_t* pipeline, wchar_t* opts, struct ErrorStruct* err);
     int64_t         _CountDocuments(mongoc_collection_t* c, wchar_t* utf16query, wchar_t* utf16opts, struct ErrorStruct* err);

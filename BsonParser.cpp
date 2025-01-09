@@ -28,16 +28,21 @@ extern "C" {
             return wstr;
         }
 
-        // Function to handle BSON value and return wchar_t string
+        // Convert "any" iter value to utf16 str, can be subdocument, array, string...
         wchar_t* convert_bson_iter_value(const bson_iter_t* iter) {
             wchar_t* result = NULL;
 
             switch (bson_iter_type(iter)) {
             case BSON_TYPE_UTF8: {
-                const char* utf8_str;
-                uint32_t utf8_len;
+                const char* utf8_str = NULL;  // Initialize pointer to NULL for safety
+                uint32_t utf8_len = 0;       // Initialize length to 0 for clarity
                 utf8_str = bson_iter_utf8(iter, &utf8_len);
-                result = utf8_to_wchar(utf8_str);  // Convert UTF-8 string to wchar_t
+                if (utf8_str != NULL) {
+                    result = utf8_to_wchar(utf8_str);  // Convert UTF-8 to wchar_t
+                }
+                else {
+                    result = _wcsdup(L"");  // If string is NULL, return an empty wide string
+                }
                 break;
             }
 
@@ -83,6 +88,7 @@ extern "C" {
                 bson_iter_document(iter, &length, &data);
                 bson_t* nested_doc = bson_new_from_data(data, length);
                 result = utils::bson_t_to_wchar_t(nested_doc);
+                bson_destroy(nested_doc);
                 //result = _wcsdup(L"Embedded Document");  // Use _wcsdup instead of wcsdup
                 break;
             }
@@ -92,12 +98,13 @@ extern "C" {
                 uint32_t length;
                 bson_iter_array(iter, &length, &data);
                 bson_t* nested_doc = bson_new_from_data(data, length);
-                result = utils::bson_t_to_wchar_t(nested_doc);
+                size_t my_size_t = static_cast<size_t>(length);
+                char* _utf8 = bson_array_as_canonical_extended_json(nested_doc, &my_size_t);
+                result = (wchar_t*)utils::charToWChar(_utf8);
+                //result = utils::bson_t_to_wchar_t(nested_doc);
+                bson_free(_utf8);
+                bson_destroy(nested_doc);
                 break;
-                //todo: use this?
-                //https://mongoc.org/libbson/current/bson_array_as_canonical_extended_json.html
-                //bson_array_as_canonical_extended_json (const bson_t *bson, size_t *length);
-
 
             }
 
@@ -110,27 +117,27 @@ extern "C" {
             }
 
             case BSON_TYPE_REGEX: {
-                const char* regex_pattern = bson_iter_regex(iter, NULL);
-                const char* regex_options = bson_iter_regex(iter, NULL);
+                const char* regex_pattern;
+                const char* regex_options;
+                regex_pattern = bson_iter_regex(iter, &regex_options);
 
-                // Convert regex_pattern and regex_options to wide-character strings
                 wchar_t* w_regex_pattern = utf8_to_wchar(regex_pattern);
                 wchar_t* w_regex_options = utf8_to_wchar(regex_options);
 
                 if (w_regex_pattern && w_regex_options) {
                     wchar_t buffer[256];
                     swprintf(buffer, sizeof(buffer) / sizeof(wchar_t), L"Regex: /%ls/%ls", w_regex_pattern, w_regex_options);
-                    result = _wcsdup(buffer);  // Use _wcsdup instead of wcsdup
+                    result = _wcsdup(buffer);
 
-                    // Clean up memory allocated for regex strings
                     free(w_regex_pattern);
                     free(w_regex_options);
                 }
                 break;
             }
-
             default:
-                result = _wcsdup(L"Unknown BSON Type");  // Use _wcsdup instead of wcsdup
+                wchar_t buffer[64];
+                swprintf(buffer, sizeof(buffer) / sizeof(wchar_t), L"Unknown BSON Type (%d)", bson_iter_type(iter));
+                result = _wcsdup(buffer);
                 break;
             }
 
@@ -154,8 +161,8 @@ extern "C" {
             return;
         }
 
-
         bool insert_bson_at_selector(bson_t* existing_doc, const char* selector, const char* key, const bson_t* new_doc) {
+            /* TODO: this function is really complex, i am not sure if we can do it without memory leak actually (bson_destroy must be called everywhere)*/
             bson_iter_t iter;
             bson_iter_t child_iter;
             bson_t updated_doc;
@@ -164,9 +171,13 @@ extern "C" {
             // Initialize the updated BSON document
             bson_init(&updated_doc);
 
-            //if no selector, insert at root
+            // If no selector, insert at the root
             if (selector == NULL || strcmp(selector, "") == 0) {
-                bson_append_document(existing_doc, key, -1, new_doc);
+                if (!bson_append_document(existing_doc, key, -1, new_doc)) {
+                    fprintf(stderr, "Failed to append BSON document at root.\n");
+                    bson_destroy(&updated_doc);
+                    return false;
+                }
                 return true;
             }
 
@@ -182,12 +193,14 @@ extern "C" {
 
                     // Make a copy of the sub-document to modify it
                     bson_t modified_child_doc;
+                    bson_init(&modified_child_doc);
                     bson_copy_to(&child_doc, &modified_child_doc);
 
                     // Insert the new BSON document into the sub-document
                     if (!bson_append_document(&modified_child_doc, key, -1, new_doc)) {
-                        fprintf(stderr, "Failed to append BSON document to child document\n");
+                        fprintf(stderr, "Failed to append BSON document to child document.\n");
                         bson_destroy(&modified_child_doc);
+                        bson_destroy(&updated_doc);
                         return false;
                     }
 
@@ -206,18 +219,19 @@ extern "C" {
                     bson_destroy(&modified_child_doc);
                 }
                 else {
-                    bson_append_document(existing_doc, key, -1, new_doc);
                     fprintf(stderr, "Selector is not a document.\n");
+                    bson_destroy(&updated_doc);
                     return false;
                 }
             }
             else {
-                bson_append_document(existing_doc, key, -1, new_doc);
                 fprintf(stderr, "Selector not found in existing document.\n");
+                bson_destroy(&updated_doc);
                 return false;
             }
 
             // Replace the original document with the updated document
+            bson_destroy(existing_doc); // Clean up the original memory
             bson_copy_to(&updated_doc, existing_doc);
             bson_destroy(&updated_doc);
 

@@ -6,7 +6,6 @@
 #include "C:\dev\FFAStrans\Processors\_indep_funcs.au3"
 #include "C:\dev\FFAStrans\Processors\_ffastrans_funcs.au3"
 
-#include "MongoDB_UDF\MongoDB_Test.au3"
 #include "MongoDB_UDF\MongoDB.au3"
 _Mongo_Init(@ScriptDir & "\MongoDB_UDF")
 #include <Debug.au3>
@@ -22,12 +21,25 @@ Local $s_mongo_collection_name 	= "configs"
 Local $sResult
 ;_MongoRunJsonTests()
 ;Initialize mongodb driver
-MsgBox(0,0,0)
+
 Local $pMCCONFIGS = _Mongo_CreateCollection($s_mongo_url, $s_mongo_database_name, $s_mongo_collection_name)
+MsgBox(0,0,0)
+Local $doc = _Mongo_FindOne($pMCCONFIGS,'{}','{}','')
+
+Local $sGetJson = _Mongo_GetJsonVal($doc,'data.workflow.nodes.0')
+ConsoleWrite("GetJson: " & $sGetJson)
+
+Exit(-1)
 
 Local $listIndexCmd = _Jkv("listIndexes",$s_mongo_collection_name) ;List indexes example
 Local $makeIndexCmd = '{"createIndexes": "'&$s_mongo_collection_name&'","indexes": [{"key":{ "full": 1 },"name": "'&$s_mongo_collection_name&'","unique": true}]}' ; make field unique forced example
 Local $aggregation_FormatDate_Cmd ='[{"$match": {}}, {"$addFields": {"mt": {"$dateToString": {"format": "%Y-%m-%d %H:%M:%S", "date": "$mt"}}}}]' ;retrieve mt date as formatted string example
+
+Local $aggregation_Distinct_cmd = '[{"$group": {"_id": "$dir" }}]'
+Local $distinctCursor = _Mongo_Coll_Aggregate($pMCCONFIGS,$aggregation_Distinct_cmd)
+Local $aDistinctDirs  = _Mongo_Cursor_To_Array($distinctCursor, "_id")
+_ArrayDisplay($aDistinctDirs)
+
 Local $begin = TimerInit()
 
 ;_MongoRunTests()
@@ -38,6 +50,8 @@ Local $begin = TimerInit()
 ; ensures unique index, done only at startup or on new DB setup
 _Mongo_ClientCommandSimple($pMCCONFIGS,$makeIndexCmd)
 
+
+Exit(1)
 
 Local $a_f = _FileListToArrayRec("C:\temp\ffastrans1407\Processors\db","*.json||jobs;mons",1,1,1,1)
 _ArrayDisplay($a_f)
