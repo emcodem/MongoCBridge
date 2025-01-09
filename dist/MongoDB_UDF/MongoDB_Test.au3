@@ -23,27 +23,8 @@ _JsonTests()
 
 UTAssert($iERRORS = 0, "======= ERRORS DETECTED ======")
 
+
 #Region mongodb.au3 - TESTS
-;~ Func _MongoRunJsonTests()
-;~ 	Local $makeIndexcmd = '{"createIndexes": "configs","indexes": [{"key":{ "name": 1 },"name": "MYINDEXNAME","unique": true},{"key":true}]}'
-;~ 	;Access array value
-;~ 	Local $ret = _Mongo_GetJsonVal($makeIndexcmd,"indexes","")
-;~ 	Local $array_ret
-;~ 	Local $aResults[2]
-;~ 	Local $iDx = -1
-;~ 	While $array_ret <> ""
-;~ 		$iDx += 1
-;~ 		$array_ret = _Mongo_GetJsonVal($ret,$iDx,"")
-;~ 		If ($array_ret <> "") Then
-;~ 			_ArrayAdd ($aResults, $array_ret)
-;~ 		EndIf
-;~ 	Wend
-		
-;~ 	If ($iDx <> 2) Then
-;~ 		ConsoleWrite("TEST ERROR: _Mongo_GetJsonVal: Array Error, expected 2, got "&$iDx)
-;~ 		Exit 1
-;~ 	EndIf
-;~ EndFunc
 
 Func _MongoRunTests()
 	Local $s_mongo_url 		= "mongodb://localhost:27017"
@@ -88,13 +69,18 @@ Func _MongoRunTests()
 	UTAssert(StringInStr($sResult,"firstBatch"),"Error ClientCommandSimple unexpected return value")
 	ConsoleWrite("listIndexes: " & $sResult & @CRLF & @CRLF)
 
-	;insert one document
+	;insert one document (Perf: 11kps)
 	$sResult = _Mongo_InsertOne($pMongocollection, '{"application":"ffastrans","boss":"steinar"}')
 	UTAssert(@error = 0,"Error _Mongo_InsertOne document @error=" & @error)
 	UTAssert($sResult = True,"Error _Mongo_InsertOne document unexpected return value")
 	ConsoleWrite("_Mongo_InsertOne Document: " & $sResult & @CRLF & @CRLF)
+	
+	;FindOne (Perf: 9kps)
+	$sResult = _Mongo_FindOne($pMongocollection,'{"application":"ffastrans"}')
+	UTAssert(@error = 0,"Error _Mongo_FindOne @error=" & @error)
+	UTAssert(StringInStr($sResult,'ffastrans'),"Error _Mongo_FindOne document unexpected return value")
+	ConsoleWrite("_Mongo_InsertOne _Mongo_FindOne: " & $sResult & @CRLF & @CRLF)
 
-	;insert one array
 	$sResult = _Mongo_InsertOne($pMongocollection, "[0,1,2,3]")
 	UTAssert(@error = 0,"Error _Mongo_InsertOne array @error=" & @error)
 	UTAssert($sResult = True,"Error _Mongo_InsertOne array unexpected return value")
