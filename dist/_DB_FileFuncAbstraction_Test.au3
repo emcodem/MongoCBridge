@@ -108,31 +108,43 @@ ConsoleWrite(@CRLF & @CRLF & "==== FileListToArrayRec TEST FINISHED, ERRORS: " &
         UTAssert(@error = 1,"_DB_FileRead" & @error)
         _DB_FileRead($empty,$empty)
         UTAssert(@error = 1,"_DB_FileRead" & @error)
-MsgBox(0,0,0)
+
         _DB_FileDelete($pDB,$empty)
-        UTAssert(@error = 1,"_DB_FileDelete " & @error)
+        UTAssert(@error = 0,"_DB_FileDelete " & @error) ; TODDO: currently mongoc does not tell if doc was deleted
 
-
-        ;~ $ret = _DB_FileWrite($pDB,"\configs\ffastrans.json",$cont)
-        ;~ UTAssert(@error = 0, "_DB_FileWrite @error is " & @error)
-        ;~ UTAssert($ret = True,"_DB_FileWrite")
+        _DB_FileWrite($pDB,"\configs\ffastrans.json",$empty)
+        UTAssert(@error = 1,"_DB_FileWrite" & @error)
+        _DB_FileWrite($pDB,$empty,$empty)
+        UTAssert(@error = 1,"_DB_FileWrite" & @error)
+        _DB_FileWrite($empty,$empty,$empty)
+        UTAssert(@error = 1,"_DB_FileWrite" & @error)
 
         ;~ ; Open - Read - Close
-        ;~ Local $h = _DB_FileOpen($pDB,"\configs\ffastrans.json")
-        ;~ UTAssert(@error = 0, "_DB_FileOpen @error is " & @error)
-        ;~ UTAssert($h = 0, "_DB_FileOpen Handle is 0 ")
+        _DB_FileOpen($pDB,$empty)
+        UTAssert(@error = 47,"_DB_FileOpen " & @error)
+        _DB_FileOpen($empty,$empty)
+        UTAssert(@error = 1,"_DB_FileOpen " & @error)
 
-        ;~ Local $cont2 = _DB_FileRead($pDB,"\configs\ffastrans.json")
-        ;~ UTAssert(@error = 0, "_DB_FileRead @error is " & @error)
-        ;~ UTAssert(StringCompare($cont, $cont2), "_DB_FileRead Content changed")
+        _DB_FileRead($pDB,$empty)
+        UTAssert(@error = 1,"_DB_FileRead " & @error)
 
-        ;~ _DB_FileClose("\configs\ffastrans.json")
-        ;~ UTAssert(UBound(MapKeys($_DB_OpenFileHandles)) = 0,"_DB_FileClose Error, " & UBound(MapKeys($_DB_OpenFileHandles)))
+        _DB_FileRead($empty,$empty)
+        UTAssert(@error = 1,"_DB_FileRead " & @error)
 
-        ;~ ; FindFirst - Next
-        ;~ $h = _DB_FileFindFirstFile($pDB,"\cache\tickets\running\*~*~*~*~*~*~*.json")
-        ;~ UTAssert(@error = 0, "_DB_FileFindFirstFile @error is " & @error)
-        ;~ UTAssert($h = 0, "_DB_FileFindFirstFile Handle is 0 ")
+        _DB_FileClose($empty)
+        UTAssert(@error = 0,"_DB_FileClose " & @error) ; TODO: should this return error if not exist?
+
+        _DB_FileFindFirstFile($pDB,$empty)        
+        UTAssert(@error = 0,"_DB_FileFindFirstFile " & @error) ; TODO: should we validate if path exists? Currently findfirst works when searching empty
+
+        _DB_FileFindFirstFile($empty,$empty) 
+        UTAssert(@error = 1,"_DB_FileFindFirstFile " & @error)
+
+        _DB_FileFindNextFile($pDB,$empty) 
+        UTAssert(@error = 0,"_DB_FileFindNextFile " & @error) ; TODO: should we validate if path exists? Currently findfirst works when searching empty
+
+        _DB_FileFindNextFile($empty,$empty) 
+        UTAssert(@error = 1,"_DB_FileFindNextFile " & @error) 
 
     EndFunc
 

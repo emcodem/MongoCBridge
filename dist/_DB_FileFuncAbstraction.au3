@@ -258,7 +258,6 @@ Func _DB_FileWrite($pDB,$sPath, $sData)
     ;ConsoleWrite("== QUERY " & $sUpdate & "==" & @CRLF)
 	_Mongo_UpdateOne($pDB, _Jkv("full", $sPath), $sUpdate, '{"upsert":true}')
     If @error Then
-        ConsoleWrite(@CRLF & @CRLF & "Error updating file " & $sPath & @CRLF & @CRLF)
 		Return SetError(@error, @extended, "")
     EndIf
     
@@ -342,7 +341,7 @@ Func _DB_FileFindFirstFile($pDB,$sPath)
        
     Local $rgx = _DB_RegexEscape($sPath)
     Local $query = '{"full": { "$regex": "' & _JSafe($rgx) & '", "$options": "i" }}'
-    Local $found = _Mongo_FindOne($pDB, $query, '{"projection":{"_id":1}}', "data")
+    Local $found = _Mongo_FindOne($pDB, $query, '{"projection":{"_id":1}}')
     
     If (@error) Then
         return SetError(@error)
