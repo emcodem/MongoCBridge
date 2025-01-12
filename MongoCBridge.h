@@ -7,7 +7,7 @@ extern "C"
     // DLL Exports
     #define DECLDIR __declspec(dllexport)
     
-    DECLDIR wchar_t* Echo( wchar_t* utf16String);  // Function takes a pointer to MyStructure
+    DECLDIR wchar_t*    Echo( wchar_t* utf16String);  // Function takes a pointer to MyStructure
 
     DECLDIR void        SetLogFile(wchar_t* filepath, struct ErrorStruct* err);
     DECLDIR void        CloseCollection(mongoc_collection_t* c);

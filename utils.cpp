@@ -117,12 +117,12 @@ namespace utils {
         }
 
         // Use wcslen to check for null termination
-        // wcslen returns the length of the string if it's valid
-        // If `str` is invalid, behavior is undefined, so we assume it's valid if `wcslen` completes.
-        size_t length = wcslen(str);
+        size_t length = wcsnlen_s(str, get_used_memory()); //the string can maximum have the size of used memory, no?
         (void)length;  // Avoid unused variable warning if needed
         return 1;  // Valid string
     }
+
+
 
     /* BSON UTILS*/
     static bool lookup_string(
@@ -159,5 +159,47 @@ namespace utils {
         return false;
     }
 
+    /* HELPERS */
 
+    long long get_installed_memory() {
+        MEMORYSTATUSEX memInfo;
+        memInfo.dwLength = sizeof(MEMORYSTATUSEX);  // Initialize the structure length
+
+        if (GlobalMemoryStatusEx(&memInfo)) {
+            // Return the total physical memory in bytes
+            return memInfo.ullTotalPhys;
+        }
+        else {
+            printf("Unable to get memory information.\n");
+            return -1; // Return -1 if there was an error
+        }
+    }
+
+    long long get_available_memory() {
+        MEMORYSTATUSEX memInfo;
+        memInfo.dwLength = sizeof(MEMORYSTATUSEX);  // Initialize the structure length
+
+        if (GlobalMemoryStatusEx(&memInfo)) {
+            // Return the available physical memory in bytes
+            return memInfo.ullAvailPhys;
+        }
+        else {
+            printf("Unable to get memory information.\n");
+            return -1; // Return -1 if there was an error
+        }
+    }
+
+    long long get_used_memory() {
+        long long totalMemory = get_installed_memory();
+        long long availableMemory = get_available_memory();
+
+        if (totalMemory != -1 && availableMemory != -1) {
+            // Calculate used memory: Total memory - Available memory
+            return totalMemory - availableMemory;
+        }
+        else {
+            printf("Unable to calculate used memory.\n");
+            return -1;
+        }
+    }
 }

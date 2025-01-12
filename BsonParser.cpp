@@ -115,6 +115,26 @@ extern "C" {
                 result = _wcsdup(buffer);  // Use _wcsdup instead of wcsdup
                 break;
             }
+            //case BSON_TYPE_BINARY: {
+            //    const uint8_t* binary_data = NULL;
+            //    uint32_t binary_len = 0;
+            //    uint8_t binary_subtype = 0;
+            //    bson_subtype_t subtype;
+
+            //    bson_iter_binary(iter, &subtype, &binary_len, &binary_data);
+
+            //    // Convert binary data to Base64 (or Hex) string
+            //    // We'll use Base64 here for demonstration:
+            //    result = (wchar_t*)malloc((binary_len * 2 + 1) * sizeof(wchar_t));
+            //    if (result) {
+            //        // Base64 encode the binary data (you'd need to implement this or use a library for it)
+            //        // For now, let's mock this conversion as a placeholder
+            //        // In real code, you'd do something like:
+            //        // base64_encode(binary_data, binary_len, result);
+            //        wcscpy_s(result, L"Base64EncodedData"); // Placeholder
+            //    }
+            //    break;
+            //}
 
             case BSON_TYPE_REGEX: {
                 const char* regex_pattern;
@@ -146,7 +166,6 @@ extern "C" {
 
         // Function to append a field to BSON document from wchar_t* string
         void append_kv(bson_t* bson, const wchar_t* key, const wchar_t* value) {
-            // Convert wide-character string to UTF-8
             std::string _sk = utils::wide_string_to_string(key);
             std::string _sv = utils::wide_string_to_string(value);
             bson_append_utf8(bson, _sk.c_str(), (int)_sk.length(), _sv.c_str(), (int)_sv.length());
@@ -154,7 +173,6 @@ extern "C" {
         }
 
         void append_bson(bson_t* bson, const wchar_t* key, const wchar_t* value) {
-            // Convert wide-character string to UTF-8
             std::string _sk = utils::wide_string_to_string(key);
             std::string _sv = utils::wide_string_to_string(value);
             bson_append_utf8(bson, _sk.c_str(), (int)_sk.length(), _sv.c_str(), (int)_sv.length());

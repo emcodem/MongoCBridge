@@ -295,18 +295,24 @@ namespace impl {
         bson_error_t error;
         bson_t* b;
 
+        if (!c) {
+            utils::charErrtoStruct(1, "Invalid collection", err);
+            return false;
+        }
+
         std::string yip = utils::wide_string_to_string(utf16Doc);
         b = bson_new_from_json((const uint8_t*)yip.c_str(), yip.size(), &error); 
         if (error.code != 0) {
             MONGOC_ERROR("Invalid json, %s",error.message);
-            utils::bsonErrtoStruct(error, err); //ensure error is set
+            utils::bsonErrtoStruct(error, err);
             return false;
         }
+
 
         if (!mongoc_collection_insert_one(
             c, b, NULL, NULL, &error)) {
             MONGOC_ERROR("mongoc_collection_insert_one error: %s\n", error.message);
-            utils::bsonErrtoStruct(error, err); //ensure error is set
+            utils::bsonErrtoStruct(error, err);
             return false;
         }
 
@@ -318,6 +324,11 @@ namespace impl {
         bson_error_t error;
         bson_t* b = NULL;
         bson_iter_t iter;
+
+        if (!c) {
+            utils::charErrtoStruct(1, "Invalid collection", err);
+            return false;
+        }
 
         // Convert the input JSON string to BSON
         std::string json_str = utils::wide_string_to_string(utf16ArrayOfJsons);
@@ -382,9 +393,12 @@ namespace impl {
                 utils::bsonErrtoStruct(error, err);
 
                 // Clean up and free allocated memory
-                for (size_t i = 0; i < doc_count; i++) {
-                    bson_destroy(docs[i]);
+                if (docs) {
+                    for (size_t i = 0; i < doc_count; i++) {
+                        bson_destroy(docs[i]);
+                    }
                 }
+                
                 free(docs);
                 bson_destroy(b);
                 return false;
@@ -392,10 +406,14 @@ namespace impl {
         }
 
         // Clean up and free allocated memory
-        for (size_t i = 0; i < doc_count; i++) {
-            bson_destroy(docs[i]);
+        if (docs) {
+            for (size_t i = 0; i < doc_count; i++) {
+                if (docs[i] != NULL)
+                    bson_destroy(docs[i]);
+            }
+            free(docs);
         }
-        free(docs);
+        
         bson_destroy(b);
 
         return true;
@@ -406,6 +424,11 @@ namespace impl {
         bson_t* opts = NULL;
         bson_error_t error;
 
+        if (!c) {
+            utils::charErrtoStruct(1, "Invalid collection", err);
+            return NULL;
+        }
+
         if (!utils::is_valid_wstring(utf16_options)) {
             utf16_options = (wchar_t*)L"{}";
         }
@@ -414,6 +437,7 @@ namespace impl {
             utils::charErrtoStruct(400, "InvalidOptionsJSON", err);
             return NULL;
         }
+
         if (!utils::is_valid_wstring(selector)) {
             selector = (wchar_t*)L"";
         }
@@ -481,15 +505,20 @@ namespace impl {
     wchar_t* _UpdateOne(mongoc_collection_t* c, wchar_t* utf_16_selector, wchar_t* utf_16_update, wchar_t* utf_16_options, struct ErrorStruct* err) {
         bson_error_t error;
 
+        if (!c) {
+            utils::charErrtoStruct(1, "Invalid collection", err);
+            return NULL;
+        }
+
         // Validate inputs
         if (!utils::is_valid_wstring(utf_16_selector)) {
-            utils::charErrtoStruct(1, "Update failed: Selector is not a valid value.", err);
-            MONGOC_ERROR("Update failed: Selector is not a valid value.\n");
+            utils::charErrtoStruct(1, "Invalid param selector.", err);
+            MONGOC_ERROR("Invalid param selector..\n");
             return NULL;
         }
         if (!utils::is_valid_wstring(utf_16_update)) {
-            utils::charErrtoStruct(1, "Update failed: Update document is not a valid value.", err);
-            MONGOC_ERROR("Update failed: Update document is not a valid value.\n");
+            utils::charErrtoStruct(1, "Invalid param update.", err);
+            MONGOC_ERROR("Invalid param update.\n");
             return NULL;
         }
         if (!utils::is_valid_wstring(utf_16_options)) {
@@ -498,8 +527,23 @@ namespace impl {
 
         // Convert input strings to BSON
         bson_t* selector = utils::wchar_to_bson_t(utf_16_selector);
+        if (selector == NULL) {
+            MONGOC_ERROR("Invalid param selector.");
+            utils::charErrtoStruct(1, "Invalid param selector.", err);
+            return NULL;
+        }
         bson_t* update = utils::wchar_to_bson_t(utf_16_update);
+        if (update == NULL) {
+            MONGOC_ERROR("Invalid param update.");
+            utils::charErrtoStruct(1, "Invalid param update.", err);
+            return NULL;
+        }
         bson_t* opts = utils::wchar_to_bson_t(utf_16_options);
+        if (update == NULL) {
+            MONGOC_ERROR("Invalid param opts.");
+            utils::charErrtoStruct(1, "Invalid param opts.", err);
+            return NULL;
+        }
         bson_t* reply = bson_new();
 
         if (!selector || !update || !opts) {
@@ -538,6 +582,11 @@ namespace impl {
     {
         bson_error_t error;
 
+        if (!c) {
+            utils::charErrtoStruct(1, "Invalid collection", err);
+            return false;
+        }
+
         if (!utils::is_valid_wstring(utf_16_selector)) {
             utils::charErrtoStruct(1, "delete failed because selector was not a valid value", err);
             MONGOC_ERROR("delete failed because selector was not a valid value");
@@ -545,18 +594,27 @@ namespace impl {
         }
 
         bson_t* selector = utils::wchar_to_bson_t(utf_16_selector);
+        if (selector == NULL) {
+            MONGOC_ERROR("Invalid param selector.");
+            utils::charErrtoStruct(1, "Invalid param selector.", err);
+            return NULL;
+        }
+
+
         if (!mongoc_collection_remove(c, MONGOC_REMOVE_SINGLE_REMOVE, selector, NULL, &error)) {
             MONGOC_ERROR("Delete failed: %s\n", error.message);
             utils::bsonErrtoStruct(error, err);
             bson_destroy(selector);
             return false;
         }
+
         if (error.code) {
             MONGOC_ERROR("bson_new_from_json error: %s\n", error.message);
             utils::bsonErrtoStruct(error, err);
             bson_destroy(selector);
             return false;
         }
+
         bson_destroy(selector);
         return true;
     }
@@ -567,6 +625,11 @@ namespace impl {
         bson_t* opts = NULL;
         bson_error_t error;
 
+        if (!c) {
+            utils::charErrtoStruct(1, "Invalid collection", err);
+            return NULL;
+        }
+
         // Validate options string and set default if invalid
         if (!utils::is_valid_wstring(utf_16_options)) {
             utf_16_options = (wchar_t*)L"{}";
@@ -574,8 +637,19 @@ namespace impl {
 
         // Convert options and query to BSON
         opts = utils::wchar_to_bson_t(utf_16_options);
+        if (opts == NULL) {
+            MONGOC_ERROR("selector");
+            utils::charErrtoStruct(1, "_CountDocuments failed: opts is not a valid value.", err);
+            return NULL;
+        }
+
         std::string utf8_query = utils::wide_string_to_string(utf16_query_json);
         filter = bson_new_from_json((const uint8_t*)utf8_query.c_str(), utf8_query.size(), &error);
+        if (filter == NULL) {
+            MONGOC_ERROR("Invalid param filter.");
+            utils::charErrtoStruct(1, "Invalid param filter.", err);
+            return NULL;
+        }
 
         if (error.code) {
             MONGOC_ERROR("_FindMany error: %s\n", error.message);
@@ -596,16 +670,31 @@ namespace impl {
     mongoc_cursor_t* _Collection_Aggregate(mongoc_collection_t* c, wchar_t* pipeline, wchar_t* opts, struct ErrorStruct* err)
     {
         /* returns cursor, caller needs to destroy it */
+        if (!c) {
+            utils::charErrtoStruct(1, "Invalid collection", err);
+            return NULL;
+        }
 
         if (!utils::is_valid_wstring(pipeline)) {
             pipeline = (wchar_t*)L"{}";
         }
         if (!utils::is_valid_wstring(opts)) {
-            pipeline = (wchar_t*)L"{ cursor: { batchSize: 1 }";
+            opts = (wchar_t*)L"{ cursor: { batchSize: 1 }";
         }
 
         bson_t* bson_opts       = utils::wchar_to_bson_t(opts);
         bson_t* bson_pipeline   = utils::wchar_to_bson_t(pipeline);
+
+        if (bson_opts == NULL) {
+            MONGOC_ERROR("Invalid param opts.");
+            utils::charErrtoStruct(1, "Invalid param opts.", err);
+            return NULL;
+        }
+        if (bson_pipeline == NULL) {
+            MONGOC_ERROR("Invalid param pipeline.");
+            utils::charErrtoStruct(1, "Invalid param pipeline.", err);
+            return NULL;
+        }
 
         mongoc_cursor_t* results = mongoc_collection_aggregate(c,
             MONGOC_QUERY_NONE,
@@ -623,7 +712,22 @@ namespace impl {
         bson_error_t error;
         bson_t* selector = utils::wchar_to_bson_t(utf16query);
         bson_t* opts = utils::wchar_to_bson_t(utf16opts);
+        
+        if (!c) {
+            utils::charErrtoStruct(1, "Invalid collection", err);
+            return NULL;
+        }
 
+        if (selector == NULL) {
+            MONGOC_ERROR("Invalid param selector");
+            utils::charErrtoStruct(1, "Invalid param selector", err);
+            return NULL;
+        }
+        if (opts == NULL) {
+            MONGOC_ERROR("Invalid param opts");
+            utils::charErrtoStruct(1, "Invalid param opts", err);
+            return NULL;
+        }
         int64_t count = mongoc_collection_count_documents(c, selector, opts, NULL, NULL, &error);
        
         bson_destroy(selector);
@@ -649,10 +753,17 @@ namespace impl {
             selector = (wchar_t*)L"";
         }
 
+        if (cursor == NULL) {
+            MONGOC_ERROR("_CursorNext failed: Cursor is null");
+            utils::charErrtoStruct(1, "_CursorNext failed: Cursor is null", err);
+            return NULL;
+        }
+
         if (mongoc_cursor_next(cursor, (const bson_t**) & doc)) {
             
             std::string sselector = utils::wide_string_to_string(selector);
             //if selector, search into bson
+            wchar_t* bla = utils::bson_t_to_wchar_t(doc);
             if (strcmp(sselector.c_str(), "") != 0) {
                 if (bson_iter_init(&iter, doc) && bson_iter_find_descendant(&iter, sselector.c_str(), &iter)) {
                     // If the path exists, append the key-value pair at the found location
@@ -680,12 +791,23 @@ namespace impl {
     }
 
     wchar_t* _ClientCommandSimple(mongoc_collection_t* c, wchar_t* utf_16_command, wchar_t* database, struct ErrorStruct* err) {
+        
         if (!utils::is_valid_wstring(utf_16_command)) {
             MONGOC_ERROR("Invalid parameter \"command\"\n");
             return NULL;
         }
+        if (!c) {
+            utils::charErrtoStruct(1, "Invalid collection", err);
+            return NULL;
+        }
 
         bson_t* command = utils::wchar_to_bson_t(utf_16_command);
+        if (command == NULL) {
+            MONGOC_ERROR("Invalid param command");
+            utils::charErrtoStruct(1, "Invalid param command", err);
+            return NULL;
+        }
+
         bson_t* reply = bson_new();
         bson_error_t error;
 

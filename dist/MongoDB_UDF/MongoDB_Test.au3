@@ -111,6 +111,11 @@ Func _MongoRunTests()
 	UTAssert(Ubound($aArray) = 3,"TEST ERROR: _Mongo_Cursor_To_Array, expected: 3, got: " & Ubound ($aArray))
 	ConsoleWrite("_Mongo_Cursor_To_Array: " & Ubound($aArray) & @CRLF & @CRLF)
 
+	$sResult = _Mongo_FindMany($pMongocollection, "{}", "{}")
+	Local $aArray = _Mongo_Cursor_To_Array($sResult,"",True)
+	UTAssert(Ubound($aArray) = 4,"TEST ERROR: _Mongo_Cursor_To_Array, expected: 4, got: " & Ubound ($aArray))
+	ConsoleWrite("_Mongo_Cursor_To_Array: " & Ubound($aArray) & @CRLF & @CRLF)
+	
 EndFunc
 
 #EndRegion mongodb.au3 - TESTS

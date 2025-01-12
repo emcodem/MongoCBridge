@@ -35,7 +35,9 @@ namespace utils {
     // Validates whether the given wchar_t* is a valid null-terminated wide string.
     int is_valid_wstring(wchar_t* str);
 
-    
+    long long get_installed_memory(void);
+    long long get_available_memory(void);
+    long long get_used_memory(void);
 
 } // namespace utils
 

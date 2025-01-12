@@ -8,7 +8,7 @@ Opt("MustDeclareVars", 1)
 
 ; #INDEX# =======================================================================================================================
 ; Title .........: MongoDB Driver for Autoit
-; AutoIt Version : 3.3.10.2
+; AutoIt Version : 3.3.16.1
 ; Language ......: English
 ; Author(s) .....: emcodem
 ; Modifiers .....:
@@ -34,6 +34,34 @@ Opt("MustDeclareVars", 1)
 ;~ _Mongo_GetJsonVal($sJson, $sSelector, $sDefault = "")
 ;~ _Mongo_AppendJsonKV($sJson, $sK, $sV="", $selector="")
 ;~ _Mongo_JsonAppendSubJson($sJson, $sK, $sV='{"key":"value"}', $selector="" )
+
+; #CONSTANTS# ===================================================================================================================
+
+;autoit docs say we should move these to _constants.au3 but we don't want the user to have to import multiple scripts as it all belongs together
+GLOBAL CONST $__BSON_TYPE_EOD = 0x00
+GLOBAL CONST $__BSON_TYPE_DOUBLE = 0x01
+GLOBAL CONST $__BSON_TYPE_UTF8 = 0x02
+GLOBAL CONST $__BSON_TYPE_DOCUMENT = 0x03
+GLOBAL CONST $__BSON_TYPE_ARRAY = 0x04
+GLOBAL CONST $__BSON_TYPE_BINARY = 0x05
+GLOBAL CONST $__BSON_TYPE_UNDEFINED = 0x06
+GLOBAL CONST $__BSON_TYPE_OID = 0x07
+GLOBAL CONST $__BSON_TYPE_BOOL = 0x08
+GLOBAL CONST $__BSON_TYPE_DATE_TIME = 0x09
+GLOBAL CONST $__BSON_TYPE_NULL = 0x0A
+GLOBAL CONST $__BSON_TYPE_REGEX = 0x0B
+GLOBAL CONST $__BSON_TYPE_DBPOINTER = 0x0C
+GLOBAL CONST $__BSON_TYPE_CODE = 0x0D
+GLOBAL CONST $__BSON_TYPE_SYMBOL = 0x0E
+GLOBAL CONST $__BSON_TYPE_CODEWSCOPE = 0x0F
+GLOBAL CONST $__BSON_TYPE_INT32 = 0x10
+GLOBAL CONST $__BSON_TYPE_TIMESTAMP = 0x11
+GLOBAL CONST $__BSON_TYPE_INT64 = 0x12
+GLOBAL CONST $__BSON_TYPE_DECIMAL128 = 0x13
+GLOBAL CONST $__BSON_TYPE_MAXKEY = 0x7F
+GLOBAL CONST $__BSON_TYPE_MINKEY = 0xFF
+
+; ===============================================================================================================================
 
 #Region mongodb.au3 - Functions
 ; #FUNCTION# ====================================================================================================================
@@ -266,7 +294,7 @@ EndFunc
 ; Example .......: Yes
 ; ===============================================================================================================================
 Func _Mongo_DeleteOne($pMongocollection, $sQuery)
-	Local $t1;
+	Local $t1
 	Local $pQuery 		= __Mongo_MakeWstrPtr($sQuery,$t1)
 	Local $tErr  		= __Mongo_MakeErrStruct()
 	Local $pErr 		= DllStructGetPtr($tErr)
@@ -366,6 +394,7 @@ Func _Mongo_CursorNext($pCursor, ByRef $sNext,  $sSelector = "")
 	;shame on me that i did not find a better way to return the $aResult from the dll
 	;could have just returned wchar_t* like in findOne but i wanted the bool as returnval from C side
 	$sNext = DllStructGetData(DllStructCreate("wchar[" & $aResult[3] & "]", $aResult[2]), 1)
+	
 	return $aResult[0] ; bool
 EndFunc
 
@@ -375,6 +404,7 @@ EndFunc
 ; Syntax.........: _Mongo_Cursor_To_Array($pCursor, $sSelector="")
 ; Parameters ....:  $pCursor (returned by a Function like FindMany)
 ;   				$sSelector = "" see _Mongo_CursorNext
+;					$bAddSize  = True/Fals adds count as first array item, 0 if empty
 ; Return values .: Array
 ; Author ........: emcodem
 ; Modified.......:
@@ -384,18 +414,32 @@ EndFunc
 ; Link ..........:
 ; Example .......: Yes
 ; ===============================================================================================================================
-Func _Mongo_Cursor_To_Array($pCursor,$sSelector = "")
+
+Func _Mongo_Cursor_To_Array($pCursor,$sSelector = "",$bAddSize = False)
 	Local $sNext
-	Local $aArray [0]
+	Local $aArray[1000]
+	If $bAddSize = True Then
+		_ArrayAdd($aArray,0)
+	EndIf
+	Local $iCnt = $bAddSize = True ? 1 : 0
 	While (_Mongo_CursorNext($pCursor,$sNext,$sSelector))
 		If (@error) And ( @error <> 47) Then
-			ConsoleWrite("_Mongo_Cursor_To_Array error " & @error & @CRLF)
 			return SetError(@error)
 		EndIf
-		Local $copy = $sNext
-		_ArrayAdd ($aArray, $copy)
-
+		If (UBound($aArray)-1 < $iCnt) Then
+			ReDim $aArray[UBound($aArray) + 1000]
+		EndIf
+		$aArray[$iCnt] = $sNext
+		$iCnt = $iCnt+1
 	WEnd
+	;ConsoleWrite("_Mongo_Cursor_To_Array " & $pCursor & @LF)
+	_ArrayDelete($aArray, $iCnt & "-" & UBound($aArray)-1)
+	If $bAddSize = True Then
+		$aArray[0] = UBound($aArray) - 1
+		If (UBound($aArray) = 1) Then
+			$aArray = 0
+		EndIf
+	EndIf
 	_Mongo_CursorDestroy($pCursor)
 	return $aArray
 EndFunc
@@ -516,6 +560,21 @@ EndFunc
 #EndRegion mongodb.au3 - Functions - MISC
 
 #Region Experimental functions DO NOT USE
+
+
+
+Func _overwrite_binary_data_with_dot_notation($pBson, $binaryData, $sSelector="")
+	Local $t1,$t2,$t3
+	Local $pSel 	= __Mongo_MakeWstrPtr($sSelector, $t1)
+	
+	$t2 = DllStructCreate("byte[" & BinaryLen($binaryData) & "]")
+    DllStructSetData($t2, 1, $binaryData)
+	Local $pBinary 	= DllStructGetPtr($t2)
+    
+
+	Local $aResult 	= DllCall($__hMongo_1_29_1, "PTR", "_overwrite_binary_data_with_dot_notation","ptr",$pBson,"ptr", $pSel, "ptr", $pBinary, "uint",BinaryLen($binaryData));
+	
+EndFunc
 
 Func _bson_new_from_json($s)
 	Local $t1
