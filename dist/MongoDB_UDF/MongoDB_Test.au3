@@ -64,10 +64,19 @@ Func _MongoRunTests()
 	ConsoleWrite("create: " & $sResult & @CRLF & @CRLF)
 
 	;list indexes
+	ConsoleWrite("Testing listIndexes command" & @CRLF)
 	$sResult = _Mongo_ClientCommandSimple($pMongocollection, '{"listIndexes": "'&$s_mongo_collection_name&'"}' )  
 	UTAssert(@error = 0,"Error ClientCommandSimple listIndexes @error=" & @error)
 	UTAssert(StringInStr($sResult,"firstBatch"),"Error ClientCommandSimple unexpected return value")
 	ConsoleWrite("listIndexes: " & $sResult & @CRLF & @CRLF)
+
+	;update command with upsert
+	ConsoleWrite("Testing _Mongo_ClientCommandSimple command with upsert" & @CRLF)
+	$sResult = _Mongo_ClientCommandSimple($pMongocollection, '{"update":"students","updates":[{"q":{"name":"harry"},"u":{"$set":{"passed":true,"name":"harry"}},"upsert":true},{"q":{"name":"steinar"},"u":{"$set":{"passed":false,"name":"steinar"}},"upsert":true}],"writeConcern":{"w":1},"maxTimeMS":5000,"bypassDocumentValidation":false}')
+	ConsoleWrite("Error: " & @error & " - " & @extended & @CRLF)
+	UTAssert(@error = 0,"Error ClientCommandSimple update @error=" & @error)
+	UTAssert(StringInStr($sResult,"ok"),"Error ClientCommandSimple update unexpected return value")
+	ConsoleWrite("update: " & $sResult & @CRLF & @CRLF)
 
 	;insert one document (Perf: 11kps)
 	$sResult = _Mongo_InsertOne($pMongocollection, '{"application":"ffastrans","boss":"steinar"}')
@@ -96,6 +105,11 @@ Func _MongoRunTests()
 	UTAssert(@error = 0,"Error _Mongo_InsertMany @error=" & @error)
 	UTAssert($sResult = True,"Error _Mongo_InsertMany unexpected return value")
 	ConsoleWrite("_Mongo_InsertMany: " & $sResult & @CRLF & @CRLF)
+
+	$sResult = _Mongo_InsertMany($pMongocollection,'[{"application":"linux"},{"application":"android"}]', '{"upsert":true}')
+	UTAssert(@error = 0,"Error _Mongo_InsertMany with upsert @error=" & @error)
+	UTAssert($sResult = True,"Error _Mongo_InsertMany with upsert unexpected return value")
+	ConsoleWrite("_Mongo_InsertMany with upsert: " & $sResult & @CRLF & @CRLF)
 
 	$sResult = _Mongo_DeleteOne($pMongocollection,'{"application":"macos"}')
 	UTAssert(@error = 0,"Error _Mongo_DeleteOne @error=" & @error)
