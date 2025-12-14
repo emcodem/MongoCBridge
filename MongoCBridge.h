@@ -15,7 +15,7 @@ extern "C"
 
     DECLDIR mongoc_collection_t* CreateCollection(wchar_t* utf16_conn_str, wchar_t* db_name, wchar_t* collection_name, struct ErrorStruct* err);
     DECLDIR bool        InsertOne(mongoc_collection_t* c, wchar_t* utf16String, struct ErrorStruct* err);
-    DECLDIR bool        InsertMany(mongoc_collection_t* c, wchar_t* utf16ArrayOfJsons, struct ErrorStruct* err);
+    DECLDIR wchar_t*    InsertMany(mongoc_collection_t* c, wchar_t* utf16ArrayOfJsons, wchar_t* utf_16_options, struct ErrorStruct* err);
     DECLDIR wchar_t*    FindOne(mongoc_collection_t* c, wchar_t* query, wchar_t* utf_16_options, wchar_t* top_level_field, struct ErrorStruct* err);
     DECLDIR wchar_t*    UpdateOne(mongoc_collection_t* c, wchar_t* utf16_search, wchar_t* utf16_update, wchar_t* utf16_options, struct ErrorStruct* err);
     DECLDIR bool        DeleteOne(mongoc_collection_t* c, wchar_t* utf16_search, struct ErrorStruct* err);
@@ -61,7 +61,7 @@ namespace impl {
 
     mongoc_collection_t* _CreateCollection(wchar_t* utf16_conn_str, wchar_t* db_name, wchar_t* collection_name, struct ErrorStruct* err);
     bool         _InsertOne(mongoc_collection_t* c, wchar_t* utf16String, struct ErrorStruct* err);
-    bool        _InsertMany(mongoc_collection_t* c, wchar_t* utf16Doc, struct ErrorStruct* err);
+    wchar_t*    _InsertMany(mongoc_collection_t* c, wchar_t* utf16Doc, wchar_t* utf_16_options, struct ErrorStruct* err);
     wchar_t*    _FindOne(mongoc_collection_t* c, wchar_t* query, wchar_t* utf_16_options, wchar_t* top_level_field, struct ErrorStruct* err);
     wchar_t*    _UpdateOne(mongoc_collection_t* c, wchar_t* query, wchar_t* payload, wchar_t* utf16_options, struct ErrorStruct* err);
     bool         _DeleteOne(mongoc_collection_t* c, wchar_t* query, struct ErrorStruct* err);

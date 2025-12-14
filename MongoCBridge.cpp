@@ -55,9 +55,9 @@ extern "C"
         return impl::_InsertOne(c, utf16String, err);
     }
 
-    DECLDIR bool InsertMany(mongoc_collection_t* c, wchar_t* utf16ArrayOfJsons, struct ErrorStruct* err)
+    DECLDIR wchar_t* InsertMany(mongoc_collection_t* c, wchar_t* utf16ArrayOfJsons, wchar_t* utf_16_options, struct ErrorStruct* err)
     {
-        return impl::_InsertMany(c, utf16ArrayOfJsons, err);
+        return impl::_InsertMany(c, utf16ArrayOfJsons, utf_16_options, err);
     }
 
     DECLDIR wchar_t* FindOne(mongoc_collection_t* c, wchar_t* query, wchar_t* utf_16_options, wchar_t* selector, struct ErrorStruct* err)
@@ -320,14 +320,27 @@ namespace impl {
         return true;
     }
    
-    bool _InsertMany(mongoc_collection_t* c, wchar_t* utf16ArrayOfJsons, struct ErrorStruct* err) {
+    wchar_t* _InsertMany(mongoc_collection_t* c, wchar_t* utf16ArrayOfJsons, wchar_t* utf_16_options, struct ErrorStruct* err) {
         bson_error_t error;
         bson_t* b = NULL;
+        bson_t* opts = NULL;
+        bson_t* reply = bson_new();
         bson_iter_t iter;
 
         if (!c) {
             utils::charErrtoStruct(1, "Invalid collection", err);
-            return false;
+            bson_destroy(reply);
+            return NULL;
+        }
+
+        if (!utils::is_valid_wstring(utf_16_options)) {
+            utf_16_options = (wchar_t*)L"{}";
+        }
+        opts = utils::wchar_to_bson_t(utf_16_options);
+        if (!opts) {
+            utils::charErrtoStruct(400, "InvalidOptionsJSON", err);
+            bson_destroy(reply);
+            return NULL;
         }
 
         // Convert the input JSON string to BSON
@@ -337,7 +350,9 @@ namespace impl {
         if (!b) {
             // Conversion to BSON failed
             utils::bsonErrtoStruct(error, err);
-            return false;
+            bson_destroy(reply);
+            bson_destroy(opts);
+            return NULL;
         }
 
         bson_t** docs = NULL;  // Array to hold BSON documents
@@ -346,8 +361,10 @@ namespace impl {
         // Initialize the iterator
         if (!bson_iter_init(&iter, b)) {
             bson_destroy(b);
+            bson_destroy(reply);
+            bson_destroy(opts);
             utils::charErrtoStruct(1, "Could not initialize iterator for the document list", err);
-            return false;
+            return NULL;
         }
 
         // Iterate through the array of BSON documents
@@ -388,7 +405,7 @@ namespace impl {
 
         // Insert the documents into the collection
         if (doc_count > 0) {
-            if (!mongoc_collection_insert_many(c, (const bson_t**)docs, doc_count, NULL, NULL, &error)) {
+            if (!mongoc_collection_insert_many(c, (const bson_t**)docs, doc_count, opts, reply, &error)) {
                 MONGOC_ERROR("_InsertMany: InsertMany failed: %s", error.message);
                 utils::bsonErrtoStruct(error, err);
 
@@ -401,7 +418,9 @@ namespace impl {
                 
                 free(docs);
                 bson_destroy(b);
-                return false;
+                bson_destroy(opts);
+                bson_destroy(reply);
+                return NULL;
             }
         }
 
@@ -415,8 +434,13 @@ namespace impl {
         }
         
         bson_destroy(b);
+        bson_destroy(opts);
 
-        return true;
+        // Convert reply to wchar_t* and clean up
+        wchar_t* result = utils::bson_t_to_wchar_t(reply);
+        bson_destroy(reply);
+
+        return result;
     }
 
     wchar_t* _FindOne(mongoc_collection_t* c, wchar_t* utf16_query_json, wchar_t* utf16_options, wchar_t* selector, struct ErrorStruct* err) {
@@ -927,7 +951,7 @@ namespace impl {
 //    wcscpy_s(modifiable_str, prefixLength, constr); 
 //
 //    //impl::_ConnectDatabase(modifiable_str);
-//    const wchar_t* prefix = L"{\"hello\":\"worldöy\"}";
+//    const wchar_t* prefix = L"{\"hello\":\"worldï¿½y\"}";
 //    //impl::_InsertOne((wchar_t*)prefix);
 //    return 0;
 //}

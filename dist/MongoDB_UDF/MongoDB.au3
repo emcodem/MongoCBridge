@@ -182,6 +182,7 @@ EndFunc
 ; Syntax.........: _Mongo_InsertMany($pMongocollection, $sJson)
 ; Parameters ....: $pMongocollection   		- from CreateCollection
 ;                  $sJson        			- valid JSON str, starting with "[" it is an array of documents.
+;				   $sOptions				- count opts (usually {}) or {"upsert":true}
 ; Return values .: Boolean, false if failed
 ; Author ........: emcodem
 ; Modified.......:
@@ -189,13 +190,14 @@ EndFunc
 ; Link ..........:
 ; Example .......: Yes
 ; ===============================================================================================================================
-Func _Mongo_InsertMany($pMongocollection, Const ByRef $sJson)
-	Local $t1
+Func _Mongo_InsertMany($pMongocollection, Const ByRef $sJson, $sOptions = "{}")
+	Local $t1,$t2
 	Local $pJson 	= __Mongo_MakeWstrPtr($sJson,$t1)
+	Local $pOpt 	= __Mongo_MakeWstrPtr($sOptions,$t2)
 	Local $tErr  	= __Mongo_MakeErrStruct()
 	Local $pErr 	= DllStructGetPtr($tErr)
 
-	Local $aResult 	= DllCall($__hMongo_1_29_1, "BOOLEAN", "InsertMany", "ptr", $pMongocollection, "ptr",$pJson, "ptr", $pErr)
+	Local $aResult 	= DllCall($__hMongo_1_29_1, "BOOLEAN", "InsertMany", "ptr", $pMongocollection, "ptr",$pJson, "ptr", $pOpt, "ptr", $pErr)
 	return $tErr.code <> 0 ? SetError($tErr.code, $tErr.code, $tErr.message) : $aResult[0]
 EndFunc
 
